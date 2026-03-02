@@ -1,6 +1,7 @@
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
+import { CoverageMap } from './components/CoverageMap'
 
 // Fix Leaflet default marker icon broken by bundlers
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
@@ -20,11 +21,19 @@ const DEFAULT_ZOOM = 14
 
 const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
+// TODO Phase 5: replace with real authenticated user ID from Supabase Auth
+// For now, no userId is passed so all roads display as "fresh" (green).
+// Once walk tracking is in (Phase 4), pass the logged-in user's UUID here.
+const DEMO_USER_ID: string | undefined = undefined
+
 function App() {
   return (
     <div className="relative h-full w-full">
-      {/* Header bar */}
-      <div className="absolute top-0 left-0 right-0 z-[1000] bg-green-600 text-white px-4 py-2 flex items-center justify-between shadow-md">
+      {/* Header */}
+      <div
+        style={{ zIndex: 1000 }}
+        className="absolute top-0 left-0 right-0 bg-green-600 text-white px-4 py-2 flex items-center justify-between shadow-md"
+      >
         <span className="font-bold text-lg tracking-tight">Fresh Steps 🥾</span>
         <span className="text-xs text-green-100">Baar, Switzerland</span>
       </div>
@@ -49,20 +58,22 @@ function App() {
             Start exploring fresh streets!
           </Popup>
         </Marker>
+
+        {/* Coverage overlay — fetches roads for current viewport */}
+        <CoverageMap userId={DEMO_USER_ID} />
       </MapContainer>
 
       {/* API health badge */}
-      <div className="absolute bottom-4 right-4 z-[1000]">
-        <a
-          href={`${BACKEND_URL}/health`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 bg-white rounded-full px-3 py-1 text-xs font-medium shadow text-gray-600 hover:shadow-md transition-shadow"
-        >
-          <span className="h-2 w-2 rounded-full bg-green-500 inline-block" />
-          API
-        </a>
-      </div>
+      <a
+        href={`${BACKEND_URL}/health`}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ zIndex: 1000 }}
+        className="absolute bottom-4 right-4 inline-flex items-center gap-1.5 bg-white rounded-full px-3 py-1 text-xs font-medium shadow text-gray-600 hover:shadow-md transition-shadow"
+      >
+        <span className="h-2 w-2 rounded-full bg-green-500 inline-block" />
+        API
+      </a>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import sql from './db';
 import coverageRouter from './routes/coverage';
 import routeSuggestionRouter from './routes/routeSuggestion';
 import gpxExportRouter from './routes/gpxExport';
+import roadsRouter from './routes/roads';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -28,6 +29,7 @@ app.get('/health', async (_req, res) => {
 app.use('/api/coverage', coverageRouter);
 app.use('/api/routes', routeSuggestionRouter);
 app.use('/api/gpx', gpxExportRouter);
+app.use('/api/roads', roadsRouter);
 
 app.listen(PORT, () => {
   console.log(`Fresh Steps API running on port ${PORT}`);
