@@ -8,6 +8,11 @@
   width: 100%;
 }
 
+/* Push Leaflet zoom control below the app header (~3rem tall) */
+.leaflet-top.leaflet-left {
+  top: 3.25rem;
+}
+
 html, body, #root {
   height: 100%;
   width: 100%;

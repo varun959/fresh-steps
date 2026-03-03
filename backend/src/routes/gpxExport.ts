@@ -22,14 +22,27 @@ router.get('/:walkId', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Walk not found' });
     }
 
-    // Placeholder GPX generation — full implementation in Phase 4
+    const geom = walk.geometry as { type: 'LineString'; coordinates: [number, number][] }
+    const completedAt = new Date(walk.completed_at ?? new Date())
+    const durationMs = (walk.duration_seconds ?? 0) * 1000
+    const coords = geom.coordinates ?? []
+    const n = coords.length
+    const trkpts = coords.map(([lng, lat], i) => {
+      const t = new Date(completedAt.getTime() - durationMs + (n > 1 ? i / (n - 1) : 0) * durationMs)
+      return `    <trkpt lat="${lat.toFixed(7)}" lon="${lng.toFixed(7)}">\n      <time>${t.toISOString()}</time>\n    </trkpt>`
+    }).join('\n')
+
     const gpx = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Fresh Steps" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata>
     <name>Walk ${walk.id}</name>
     <time>${walk.completed_at}</time>
   </metadata>
-  <!-- Track points will be generated from geometry in Phase 4 -->
+  <trk>
+    <trkseg>
+${trkpts}
+    </trkseg>
+  </trk>
 </gpx>`;
 
     res.setHeader('Content-Type', 'application/gpx+xml');

@@ -78,10 +78,11 @@ function RoadsLayer({ roads, zoom, minZoom }: {
 
 interface CoverageMapProps {
   userId?: string
+  refreshKey?: number
 }
 
-export function CoverageMap({ userId }: CoverageMapProps) {
-  const { roads, loading, error, zoom, minZoom } = useRoads({ userId })
+export function CoverageMap({ userId, refreshKey }: CoverageMapProps) {
+  const { roads, loading, error, zoom, minZoom } = useRoads({ userId, refreshKey })
 
   return (
     <>

@@ -28,6 +28,14 @@ function project(lat: number, lng: number, distKm: number, angleDeg: number): Wa
   return { lat: lat + Δlat, lng: lng + Δlng };
 }
 
+/**
+ * Roads are longer than crow-flies distance.
+ * Dividing the crow-flies waypoint distance by this factor means
+ * Valhalla's actual road route ends up close to the requested distKm.
+ * Empirically ~1.4 for Baar/Zurich urban network.
+ */
+const ROAD_FACTOR = 1.4;
+
 export function generateCandidates(
   startLat: number,
   startLng: number,
@@ -39,16 +47,17 @@ export function generateCandidates(
   for (let i = 0; i < 8; i++) {
     const angleDeg = i * 45;
 
-    // Loop: go to midpoint then return to start
-    const mid = project(startLat, startLng, distKm / 2, angleDeg);
+    // Loop: [start → mid → start].  Crow-flies to mid = (distKm/2) / ROAD_FACTOR
+    // so that the two road legs sum to ≈ distKm.
+    const mid = project(startLat, startLng, distKm / 2 / ROAD_FACTOR, angleDeg);
     candidates.push({
       type: 'loop',
       waypoints: [start, mid, start],
       direction: angleDeg,
     });
 
-    // One-way: go straight to endpoint
-    const end = project(startLat, startLng, distKm, angleDeg);
+    // One-way: road distance ≈ crow-flies × ROAD_FACTOR → invert to hit target.
+    const end = project(startLat, startLng, distKm / ROAD_FACTOR, angleDeg);
     candidates.push({
       type: 'one-way',
       waypoints: [start, end],

@@ -49,11 +49,15 @@ function decodePolyline(encoded: string): [number, number][] {
   return coords;
 }
 
+export interface RouteResult {
+  coords: [number, number][]; // GeoJSON order [lng, lat]
+  durationSeconds: number;    // Valhalla's own pedestrian time estimate
+}
+
 /**
  * Fetch a pedestrian route from Stadia Maps Valhalla.
- * Returns coordinates as [lng, lat][] (GeoJSON order).
  */
-export async function fetchRoute(waypoints: Waypoint[], apiKey: string): Promise<[number, number][]> {
+export async function fetchRoute(waypoints: Waypoint[], apiKey: string): Promise<RouteResult> {
   const locations = waypoints.map((wp) => ({
     lon: wp.lng,
     lat: wp.lat,
@@ -66,7 +70,7 @@ export async function fetchRoute(waypoints: Waypoint[], apiKey: string): Promise
     directions_options: { units: 'km' },
   };
 
-  const url = `https://valhalla.stadiamaps.com/route?api_key=${apiKey}`;
+  const url = `https://api.stadiamaps.com/route?api_key=${apiKey}`;
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -86,6 +90,12 @@ export async function fetchRoute(waypoints: Waypoint[], apiKey: string): Promise
     };
   };
 
-  const encoded = data.trip.legs.map((l) => l.shape).join('');
-  return decodePolyline(encoded);
+  // Each leg has its own independently-encoded polyline — decode separately,
+  // then concatenate (dropping the duplicate first point on subsequent legs).
+  const allCoords: [number, number][] = [];
+  for (let i = 0; i < data.trip.legs.length; i++) {
+    const legCoords = decodePolyline(data.trip.legs[i].shape);
+    allCoords.push(...(i === 0 ? legCoords : legCoords.slice(1)));
+  }
+  return { coords: allCoords, durationSeconds: Math.round(data.trip.summary.time) };
 }

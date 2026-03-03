@@ -1,9 +1,15 @@
-import { useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents } from 'react-leaflet'
+import { useState, useCallback, useEffect } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
+import { CityLabel } from './components/CityLabel'
 import { CoverageMap } from './components/CoverageMap'
 import { RoutePlanner } from './components/RoutePlanner'
+import { WalkTracker } from './components/WalkTracker'
+import { TrackedPathLayer } from './components/TrackedPathLayer'
+import { RoutePolyline } from './components/RoutePolyline'
+import { LocateControl } from './components/LocateControl'
+import { LocationSearch } from './components/LocationSearch'
 import type { RouteResult } from './hooks/useRouteSuggestion'
 
 // Fix Leaflet default marker icon broken by bundlers
@@ -34,6 +40,19 @@ const startPinIcon = L.divIcon({
   className: '',
 })
 
+// Module-level map ref — populated by CaptureMap inside MapContainer.
+const mapRef: { current: L.Map | null } = { current: null }
+
+/**
+ * Captures the Leaflet map instance into the module-level mapRef.
+ * Must be rendered inside <MapContainer>.
+ */
+function CaptureMap() {
+  const map = useMap()
+  useEffect(() => { mapRef.current = map }, [map])
+  return null
+}
+
 /**
  * Captures map clicks to place/move the start pin.
  * Must be rendered inside <MapContainer>.
@@ -55,6 +74,13 @@ function App() {
   const [startPin, setStartPin] = useState<{ lat: number; lng: number } | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<RouteResult | null>(null)
   const [plannerOpen, setPlannerOpen] = useState(false)
+  const [walkCoords, setWalkCoords] = useState<[number, number][]>([])
+  const [walkRefreshKey, setWalkRefreshKey] = useState(0)
+  const [cityLabel, setCityLabel] = useState('Baar, Switzerland')
+
+  const handleWalkSaved = useCallback(() => {
+    setWalkRefreshKey(k => k + 1)
+  }, [])
 
   function handleMapClick(lat: number, lng: number) {
     // Only place a pin while the planner panel is open
@@ -63,9 +89,13 @@ function App() {
     }
   }
 
+  function handleLocationSelect(lat: number, lng: number) {
+    mapRef.current?.setView([lat, lng], 16)
+  }
+
   // Convert selected route GeoJSON coordinates ([lng,lat]) → Leaflet positions ([lat,lng])
   const routePositions: [number, number][] | null = selectedRoute
-    ? selectedRoute.geometry.coordinates.map(([lng, lat]) => [lat, lng])
+    ? selectedRoute.geometry.coordinates.map(([lng, lat]) => [lat, lng] as [number, number])
     : null
 
   // Build tile URL — use Stadia if key is available, otherwise fall back to OSM
@@ -85,13 +115,16 @@ function App() {
         className="absolute top-0 left-0 right-0 bg-green-600 text-white px-4 py-2 flex items-center justify-between shadow-md"
       >
         <span className="font-bold text-lg tracking-tight">Fresh Steps 🥾</span>
-        <span className="text-xs text-green-100">Baar, Switzerland</span>
+        <span className="text-xs text-green-100">{cityLabel}</span>
       </div>
 
-      {/* Hint banner when planner is open and no pin placed yet */}
+      {/* Location search — centered below the header */}
+      <LocationSearch onSelect={handleLocationSelect} />
+
+      {/* Hint banner when planner is open and no pin placed yet (below search bar) */}
       {plannerOpen && !startPin && (
         <div
-          style={{ zIndex: 1000, top: '3rem' }}
+          style={{ zIndex: 1000, top: '6rem' }}
           className="absolute left-1/2 -translate-x-1/2 mt-2 bg-white text-gray-700 text-xs px-4 py-2 rounded-full shadow-md pointer-events-none"
         >
           Tap the map to set a start point
@@ -112,7 +145,16 @@ function App() {
           maxZoom={20}
         />
 
+        {/* Capture map ref for location search panning */}
+        <CaptureMap />
+
+        {/* Reverse-geocode map center → city label in header */}
+        <CityLabel onCityChange={setCityLabel} />
+
         <MapClickHandler onMapClick={handleMapClick} />
+
+        {/* Locate-me button (appended to Leaflet top-left control area) */}
+        <LocateControl />
 
         {/* Default welcome marker — hidden when a start pin is placed */}
         {!startPin && (
@@ -132,19 +174,27 @@ function App() {
           </Marker>
         )}
 
-        {/* Selected route polyline */}
-        {routePositions && (
-          <Polyline
+        {/* Selected route polyline — arrows for loops, plain line for one-way */}
+        {routePositions && selectedRoute && (
+          <RoutePolyline
             positions={routePositions}
-            color="#2563eb"
-            weight={5}
-            opacity={0.8}
+            isLoop={selectedRoute.type === 'loop'}
           />
         )}
 
         {/* Coverage overlay — fetches roads for current viewport */}
-        <CoverageMap userId={DEMO_USER_ID} />
+        <CoverageMap userId={DEMO_USER_ID} refreshKey={walkRefreshKey} />
+
+        {/* Tracked walk path */}
+        {walkCoords.length > 0 && <TrackedPathLayer coords={walkCoords} />}
       </MapContainer>
+
+      {/* Walk Tracker FAB / panel */}
+      <WalkTracker
+        userId={DEMO_USER_ID}
+        onCoordsChange={setWalkCoords}
+        onWalkSaved={handleWalkSaved}
+      />
 
       {/* Route Planner panel / FAB */}
       <RoutePlanner

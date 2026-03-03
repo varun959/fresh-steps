@@ -74,6 +74,7 @@ function FreshnessBar({ percent }: { percent: number }) {
 
 export function RoutePlanner({ startPin, onClearPin, onRouteSelected, userId, onOpenChange }: RoutePlannerProps) {
   const [open, setOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const [duration, setDuration] = useState(45)
   const { routes, loading, error, selectedIndex, suggestRoutes, selectRoute, clearRoutes } = useRouteSuggestion()
 
@@ -84,6 +85,7 @@ export function RoutePlanner({ startPin, onClearPin, onRouteSelected, userId, on
 
   function handleClose() {
     setOpen(false)
+    setCollapsed(false)
     onOpenChange?.(false)
     clearRoutes()
     onClearPin()
@@ -92,6 +94,8 @@ export function RoutePlanner({ startPin, onClearPin, onRouteSelected, userId, on
 
   function handleFind() {
     if (!startPin) return
+    setCollapsed(false)
+    onRouteSelected(null)
     suggestRoutes(startPin.lat, startPin.lng, duration, userId)
   }
 
@@ -124,15 +128,31 @@ export function RoutePlanner({ startPin, onClearPin, onRouteSelected, userId, on
     >
       {/* Panel header */}
       <div className="flex items-center justify-between px-4 py-3 bg-green-600 text-white">
-        <span className="font-semibold text-sm">Plan a Walk</span>
-        <button onClick={handleClose} className="text-green-100 hover:text-white transition-colors">
+        <button
+          onClick={() => setCollapsed(c => !c)}
+          className="flex items-center gap-2 flex-1 text-left"
+        >
+          <span className="font-semibold text-sm">Plan a Walk</span>
+          {collapsed && routes.length > 0 && (
+            <span className="text-xs bg-white text-green-700 font-semibold px-1.5 py-0.5 rounded-full">
+              {routes.length}
+            </span>
+          )}
+          <svg
+            className={`w-4 h-4 ml-auto text-green-100 transition-transform ${collapsed ? 'rotate-180' : ''}`}
+            fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <button onClick={handleClose} className="text-green-100 hover:text-white transition-colors ml-3">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
-      <div className="overflow-y-auto flex-1 p-4 space-y-4">
+      {!collapsed && <div className="overflow-y-auto flex-1 p-4 space-y-4">
         {/* Start pin info */}
         <div>
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Start point</p>
@@ -174,8 +194,8 @@ export function RoutePlanner({ startPin, onClearPin, onRouteSelected, userId, on
           </div>
         </div>
 
-        {/* Find Routes button */}
-        {routes.length === 0 && !loading && (
+        {/* Find Routes button — always visible so duration can be changed and re-searched */}
+        {!loading && (
           <button
             onClick={handleFind}
             disabled={!startPin}
@@ -262,16 +282,9 @@ export function RoutePlanner({ startPin, onClearPin, onRouteSelected, userId, on
               })}
             </div>
 
-            {/* Re-search button */}
-            <button
-              onClick={() => { clearRoutes(); onRouteSelected(null) }}
-              className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 underline"
-            >
-              Try different settings
-            </button>
           </>
         )}
-      </div>
+      </div>}
     </div>
   )
 }

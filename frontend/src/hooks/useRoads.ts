@@ -27,9 +27,10 @@ interface GeoJSONFeature {
 
 interface UseRoadsOptions {
   userId?: string
+  refreshKey?: number
 }
 
-export function useRoads({ userId }: UseRoadsOptions = {}) {
+export function useRoads({ userId, refreshKey }: UseRoadsOptions = {}) {
   const [roads, setRoads] = useState<RoadsGeoJSON | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -107,6 +108,12 @@ export function useRoads({ userId }: UseRoadsOptions = {}) {
       if (abortController.current) abortController.current.abort()
     }
   }, [])
+
+  // Refresh roads when refreshKey changes (e.g. after a walk is saved)
+  useEffect(() => {
+    if (refreshKey !== undefined && refreshKey > 0) fetchRoads(map)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey])
 
   return { roads, loading, error, zoom, minZoom: MIN_ZOOM_FOR_ROADS }
 }

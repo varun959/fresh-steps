@@ -102,10 +102,10 @@ router.post('/suggest', async (req: Request, res: Response) => {
 
   // 3. Fetch all 16 routes from Valhalla in parallel (skip failed ones)
   const routeResults = await Promise.allSettled(
-    candidates.map((c) => fetchRoute(c.waypoints, apiKey).then((coords) => ({ c, coords }))),
+    candidates.map((c) => fetchRoute(c.waypoints, apiKey).then((result) => ({ c, ...result }))),
   );
 
-  const validRoutes: Array<{ c: CandidateWaypoints; coords: [number, number][] }> = [];
+  const validRoutes: Array<{ c: CandidateWaypoints; coords: [number, number][]; durationSeconds: number }> = [];
   for (const result of routeResults) {
     if (result.status === 'fulfilled') {
       validRoutes.push(result.value);
@@ -119,25 +119,58 @@ router.post('/suggest', async (req: Request, res: Response) => {
   }
 
   // 4. Score freshness in parallel (or return 100% if no userId)
-  const scored: RouteResult[] = await Promise.all(
-    validRoutes.map(async ({ c, coords }) => {
-      const distanceKm = coordinatesToDistanceKm(coords);
-      const estimatedDuration = Math.round((distanceKm / 5) * 60);
-      const freshnessPercent = effectiveUserId
-        ? await scoreFreshness(coords, effectiveUserId).catch(() => 100)
-        : 100;
+  //    Filter out routes whose Valhalla duration deviates >35% from the request
+  //    so badly-fitting candidates don't crowd out good ones.
+  const targetSeconds = durationMinutes * 60;
+  const scored: RouteResult[] = (
+    await Promise.all(
+      validRoutes.map(async ({ c, coords, durationSeconds }) => {
+        const ratio = durationSeconds / targetSeconds;
+        if (ratio < 0.65 || ratio > 1.35) return null; // too short or too long
 
-      return {
-        type: c.type,
-        geometry: { type: 'LineString' as const, coordinates: coords },
-        distanceKm: Math.round(distanceKm * 10) / 10,
-        durationMinutes: estimatedDuration,
-        freshnessPercent: Math.round(freshnessPercent * 10) / 10,
-      };
-    }),
-  );
+        const distanceKm = coordinatesToDistanceKm(coords);
+        const freshnessPercent = effectiveUserId
+          ? await scoreFreshness(coords, effectiveUserId).catch(() => 100)
+          : 100;
+
+        return {
+          type: c.type,
+          geometry: { type: 'LineString' as const, coordinates: coords },
+          distanceKm: Math.round(distanceKm * 10) / 10,
+          durationMinutes: Math.round(durationSeconds / 60),
+          freshnessPercent: Math.round(freshnessPercent * 10) / 10,
+        } satisfies RouteResult;
+      }),
+    )
+  ).filter((r): r is RouteResult => r !== null);
 
   // 5. Sort by freshness descending, return top 3
+  //    If the filter left fewer than 3, relax and take the closest-duration ones.
+  if (scored.length < 3) {
+    const extras = validRoutes
+      .filter(({ durationSeconds }) => {
+        const ratio = durationSeconds / targetSeconds;
+        return ratio >= 0.65 && ratio <= 1.35;
+      });
+    if (extras.length === 0) {
+      // All routes were filtered; fall back to the 3 closest to target duration
+      validRoutes.sort((a, b) =>
+        Math.abs(a.durationSeconds - targetSeconds) - Math.abs(b.durationSeconds - targetSeconds)
+      );
+      for (const { c, coords, durationSeconds } of validRoutes.slice(0, 3)) {
+        if (scored.some(s => s.geometry.coordinates === coords)) continue;
+        const distanceKm = coordinatesToDistanceKm(coords);
+        scored.push({
+          type: c.type,
+          geometry: { type: 'LineString' as const, coordinates: coords },
+          distanceKm: Math.round(distanceKm * 10) / 10,
+          durationMinutes: Math.round(durationSeconds / 60),
+          freshnessPercent: 100,
+        });
+      }
+    }
+  }
+
   scored.sort((a, b) => b.freshnessPercent - a.freshnessPercent);
   const top3 = scored.slice(0, 3);
 
