@@ -94,7 +94,7 @@ export function useWalkTracking(userId?: string) {
 
     if (currentCoords.length < 2) {
       setError('Walk too short — need at least 2 GPS points')
-      setState('idle')
+      setState('tracking') // keep panel open so error is visible
       return
     }
 
@@ -116,7 +116,7 @@ export function useWalkTracking(userId?: string) {
       setState('done')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save walk')
-      setState('idle')
+      setState('tracking') // keep panel open so error is visible
     }
   }, [userId, clearWatch])
 

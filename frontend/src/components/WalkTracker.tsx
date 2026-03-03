@@ -74,12 +74,29 @@ export function WalkTracker({ userId, onCoordsChange, onWalkSaved }: WalkTracker
           <div className="text-xs text-red-600 mb-2">{error}</div>
         )}
 
-        <button
-          onClick={stopTracking}
-          className="w-full bg-red-500 hover:bg-red-600 active:bg-red-700 text-white font-semibold text-sm py-2 rounded-xl transition-colors"
-        >
-          Stop Walk
-        </button>
+        {!error ? (
+          <button
+            onClick={stopTracking}
+            className="w-full bg-red-500 hover:bg-red-600 active:bg-red-700 text-white font-semibold text-sm py-2 rounded-xl transition-colors"
+          >
+            Stop Walk
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              onClick={dismissSummary}
+              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-sm py-2 rounded-xl transition-colors"
+            >
+              Discard
+            </button>
+            <button
+              onClick={stopTracking}
+              className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold text-sm py-2 rounded-xl transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
       </div>
     )
   }
