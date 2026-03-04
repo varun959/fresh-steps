@@ -54,6 +54,27 @@ function CaptureMap() {
 }
 
 /**
+ * On mount, requests the user's location and pans the map there.
+ * Triggers the browser permission prompt on first visit.
+ * Silently falls back to the default center if denied or unavailable.
+ */
+function AutoLocate({ onLocated }: { onLocated: () => void }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        map.setView([pos.coords.latitude, pos.coords.longitude], 15)
+        onLocated()
+      },
+      () => { /* denied or unavailable — stay on default center */ },
+      { enableHighAccuracy: true, timeout: 10_000 },
+    )
+  }, [map, onLocated])
+  return null
+}
+
+/**
  * Captures map clicks to place/move the start pin.
  * Must be rendered inside <MapContainer>.
  */
@@ -77,6 +98,7 @@ function App() {
   const [walkCoords, setWalkCoords] = useState<[number, number][]>([])
   const [walkRefreshKey, setWalkRefreshKey] = useState(0)
   const [cityLabel, setCityLabel] = useState('Baar, Switzerland')
+  const [located, setLocated] = useState(false)
 
   const handleWalkSaved = useCallback(() => {
     setWalkRefreshKey(k => k + 1)
@@ -148,6 +170,9 @@ function App() {
         {/* Capture map ref for location search panning */}
         <CaptureMap />
 
+        {/* Pan to user location on first load */}
+        <AutoLocate onLocated={() => setLocated(true)} />
+
         {/* Reverse-geocode map center → city label in header */}
         <CityLabel onCityChange={setCityLabel} />
 
@@ -156,12 +181,10 @@ function App() {
         {/* Locate-me button (appended to Leaflet top-left control area) */}
         <LocateControl />
 
-        {/* Default welcome marker — hidden when a start pin is placed */}
-        {!startPin && (
+        {/* Default welcome marker — only shown if location was not granted and no pin placed */}
+        {!startPin && !located && (
           <Marker position={BAAR_CENTER}>
             <Popup>
-              <strong>Baar, Switzerland</strong>
-              <br />
               Open "Plan a Walk" then tap the map to start!
             </Popup>
           </Marker>
