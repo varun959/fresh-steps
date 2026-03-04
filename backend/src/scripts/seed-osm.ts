@@ -45,6 +45,9 @@ const AREAS = [
   { name: 'Bangalore NW', bbox: '12.95,77.52,13.04,77.62' },
   { name: 'Bangalore NE-S', bbox: '12.95,77.62,13.00,77.72' },
   { name: 'Bangalore NE-N', bbox: '13.00,77.62,13.04,77.72' },
+  { name: 'NYC Manhattan S', bbox: '40.70,-74.02,40.79,-73.91' },
+  { name: 'NYC Manhattan N-W', bbox: '40.79,-74.02,40.88,-73.96' },
+  { name: 'NYC Manhattan N-E', bbox: '40.79,-73.96,40.88,-73.91' },
 ];
 
 interface OverpassNode {
@@ -191,7 +194,7 @@ async function main() {
   const sql = postgres(connectionString, { ssl: 'require', max: 5 });
 
   let total = 0;
-  const areasToRun = process.env.SEED_AREAS ? AREAS.filter(a => process.env.SEED_AREAS!.split(',').some(n => a.name.includes(n))) : AREAS;
+  const areasToRun = process.env.SEED_AREAS ? AREAS.filter(a => process.env.SEED_AREAS!.split(',').some(n => a.name.toLowerCase().includes(n.toLowerCase()))) : AREAS;
   for (const area of areasToRun) {
     total += await seedArea(sql, area);
   }
