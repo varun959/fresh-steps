@@ -43,14 +43,14 @@ export function useRoads({ userId, refreshKey }: UseRoadsOptions = {}) {
     const z = map.getZoom()
     setZoom(z)
 
+    // Always cancel pending debounce/in-flight request first
+    if (debounceTimer.current) clearTimeout(debounceTimer.current)
+    if (abortController.current) abortController.current.abort()
+
     if (z < MIN_ZOOM_FOR_ROADS) {
       setRoads(null)
       return
     }
-
-    // Cancel any pending debounce or in-flight request
-    if (debounceTimer.current) clearTimeout(debounceTimer.current)
-    if (abortController.current) abortController.current.abort()
 
     debounceTimer.current = setTimeout(async () => {
       const bounds = map.getBounds()
