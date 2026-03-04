@@ -66,8 +66,9 @@ export function useWalkTracking(userId?: string) {
     startedAtRef.current = new Date().toISOString()
     setState('tracking')
 
+    const startMs = Date.now()
     timerRef.current = setInterval(() => {
-      setElapsedSeconds(s => s + 1)
+      setElapsedSeconds(Math.floor((Date.now() - startMs) / 1000))
     }, 1000)
 
     watchIdRef.current = navigator.geolocation.watchPosition(
