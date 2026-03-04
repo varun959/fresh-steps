@@ -13,15 +13,15 @@ export function Legend({ loading, zoom, minZoom, roadCount }: LegendProps) {
     >
       <div className="font-semibold text-gray-800 mb-1">Coverage</div>
       <div className="flex items-center gap-2">
-        <span className="inline-block w-5 h-0.5 rounded" style={{ backgroundColor: '#16a34a' }} />
-        Fresh
+        <span className="inline-block w-5 h-0.5 rounded" style={{ backgroundColor: '#dc2626' }} />
+        Not walked
       </div>
       <div className="flex items-center gap-2">
         <span className="inline-block w-5 h-0.5 rounded" style={{ backgroundColor: '#ca8a04' }} />
         One side done
       </div>
       <div className="flex items-center gap-2">
-        <span className="inline-block w-5 h-0.5 rounded" style={{ backgroundColor: '#6b7280' }} />
+        <span className="inline-block w-5 h-0.5 rounded" style={{ backgroundColor: '#16a34a' }} />
         Covered
       </div>
 
