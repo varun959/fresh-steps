@@ -58,11 +58,16 @@ Coverage is tracked **per sidewalk side** (left/right), not per road. Walking on
 ### 3.2 Route Suggestion
 
 1. User sets a start pin on the map and enters walk duration (slider: 15–120 min)
-2. App generates 16 candidate routes: 8 loop variants (N, NE, E, SE, S, SW, W, NW) + 8 one-way variants
+2. App generates 16 candidates: 8 triangle loops (N, NE, E, SE, S, SW, W, NW) + 8 one-way variants
+   - Loops use 3 waypoints at ±60° from the target direction to force genuinely different outbound and return roads
 3. Each candidate is routed via Valhalla (Stadia Maps hosted) with pedestrian costing
 4. Freshness score: `(total_m - covered_m) / total_m × 100` via PostGIS `ST_Intersection`
-5. Top 3 routes by freshness are displayed with distance, duration, and freshness %
-6. User picks a route → opens Google Maps for turn-by-turn navigation
+5. Routes are classified into 3 types:
+   - **Loop** — different roads each way (blue badge)
+   - **Out & Back** — same road, opposite sidewalks (orange badge) — detected when return leg stays within 20 m of outbound leg
+   - **One-way** — point-to-point (purple badge)
+6. Top 3 results enforce one of each type where available, then fill by freshness
+7. User picks a route → opens Google Maps for turn-by-turn navigation
 
 **API:** `POST /api/routes/suggest` — body: `{ startLat, startLng, durationMinutes, userId? }`
 
@@ -73,7 +78,8 @@ Coverage is tracked **per sidewalk side** (left/right), not per road. Walking on
 3. Live path rendered as blue polyline on the map
 4. Timer shows elapsed time; distance computed via haversine formula
 5. User taps "Stop Walk" — walk saved to database, coverage map refreshes
-6. Summary card shows: distance, duration, new streets count, GPX download link
+6. Summary card shows: distance, duration, new streets count, GPX download link, Discard button
+   - Discard deletes the walk and its covered_segments from the database
 
 **States:** `idle → tracking → saving → done`
 
@@ -89,6 +95,7 @@ Each completed walk available as a GPX file with interpolated track points deriv
 
 | Control | Location | Behavior |
 |---------|----------|---------|
+| Auto-locate | On load | Requests GPS permission; pans to user's location if granted |
 | Zoom +/− | Top-left | Standard Leaflet zoom |
 | Current location | Top-left (below zoom) | Centers map on GPS position |
 | Location search | Top-right | Nominatim geocoding |
@@ -152,13 +159,14 @@ UNIQUE (user_id, osm_way_id, side)
 | GET | `/api/roads` | Road segments for bbox + user coverage |
 | POST | `/api/routes/suggest` | Generate top-3 fresh route suggestions |
 | POST | `/api/walks` | Save completed walk, update coverage |
+| DELETE | `/api/walks/:id` | Delete a walk and its covered_segments |
 | GET | `/api/gpx/:walkId` | Download GPX for a walk |
 
 ### OSM Data
 
 - Road network fetched from Overpass API and stored in `osm_ways`
 - Seeded regions: Baar, Zurich, Bangalore (6 quadrants), Manhattan (3 tiles)
-- Total: ~160,000+ ways
+- Total: ~307,000 ways
 - Re-seed script: `backend/src/scripts/seed-osm.ts`
 - Filter by region: `SEED_AREAS="Bangalore" npx ts-node --transpile-only src/scripts/seed-osm.ts`
 
@@ -173,7 +181,7 @@ Database schema, backend scaffold (Express + postgres.js), frontend map shell (R
 Seeded OSM road network. `/api/roads` endpoint returns GeoJSON color-coded by coverage. Coverage map rendered with canvas renderer, debounced, min zoom 13.
 
 ### Phase 3 — Route Suggestion ✅
-Valhalla routing via Stadia Maps. 16 candidate routes (8 loops + 8 one-ways). Freshness scored against PostGIS covered_segments. Top-3 displayed in collapsible RoutePlanner panel. Handoff to Google Maps.
+Valhalla routing via Stadia Maps. 16 candidates (8 triangle loops + 8 one-ways). Loop vs out-and-back classification via geometry analysis. One-of-each-type diversity in top-3. Collapsible RoutePlanner panel. Handoff to Google Maps.
 
 ### Phase 4 — Walk Tracking ✅
 GPS walk tracking with `watchPosition`. Walk save API matches GPS to OSM ways within 8 m, upserts covered_segments per side. Blue polyline rendered live. Summary card with GPX download.

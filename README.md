@@ -9,8 +9,8 @@ Built with Claude Code (agentic development), March 2026.
 ## What It Does
 
 - **Coverage map** — roads color-coded by how much of each sidewalk you've walked (red = fresh, yellow = one side done, green = fully covered)
-- **Route suggestions** — enter a duration, get 3 route options ranked by freshness; open in Google Maps for turn-by-turn
-- **Walk tracking** — records your GPS path live, saves it to the database, and updates the coverage map when you finish
+- **Route suggestions** — enter a duration, get 3 route options (loop, one-way, out & back) ranked by freshness; open in Google Maps for turn-by-turn
+- **Walk tracking** — records your GPS path live, saves it to the database, and updates the coverage map when you finish; Discard option to delete a bad recording
 - **GPX export** — download any walk as a `.gpx` file
 
 ---
@@ -110,6 +110,7 @@ fresh-steps/
 │           ├── RoutePlanner.tsx  # FAB + route suggestion panel
 │           ├── WalkTracker.tsx   # FAB + walk tracking panel
 │           ├── TrackedPathLayer.tsx # Live GPS polyline
+│           ├── CityLabel.tsx     # Reverse-geocoded city in header
 │           ├── Legend.tsx
 │           ├── LocateControl.tsx
 │           └── LocationSearch.tsx
