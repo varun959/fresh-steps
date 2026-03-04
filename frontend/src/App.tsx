@@ -178,7 +178,7 @@ function App() {
         {routePositions && selectedRoute && (
           <RoutePolyline
             positions={routePositions}
-            isLoop={selectedRoute.type === 'loop'}
+            isLoop={selectedRoute.type === 'loop' || selectedRoute.type === 'out-and-back'}
           />
         )}
 

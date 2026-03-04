@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react'
 const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 export interface RouteResult {
-  type: 'loop' | 'one-way'
+  type: 'loop' | 'one-way' | 'out-and-back'
   geometry: { type: 'LineString'; coordinates: [number, number][] }
   distanceKm: number
   durationMinutes: number

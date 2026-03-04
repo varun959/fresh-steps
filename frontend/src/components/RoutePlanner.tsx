@@ -6,7 +6,7 @@
  *  2. Pin set: panel expands — pin coords, duration input, "Find Routes"
  *  3. Loading: spinner
  *  4. Results: 3 route cards (distance, duration, freshness %, type)
- *  5. Selected: "Open in Google Maps" + "Open in Apple Maps" buttons
+ *  5. Selected: "Open in Google Maps" button
  */
 import { useState } from 'react'
 import { useRouteSuggestion } from '../hooks/useRouteSuggestion'
@@ -41,21 +41,18 @@ function buildGoogleMapsUrl(route: RouteResult): string {
   return `${base}&${params.toString()}`
 }
 
-function buildAppleMapsUrl(route: RouteResult): string {
-  const coords = route.geometry.coordinates
-  const [sLng, sLat] = coords[0]
-  const [dLng, dLat] = coords[coords.length - 1]
-  return `maps://maps.apple.com/?saddr=${sLat},${sLng}&daddr=${dLat},${dLng}&dirflg=w`
-}
-
-function TypeBadge({ type }: { type: 'loop' | 'one-way' }) {
+function TypeBadge({ type }: { type: 'loop' | 'one-way' | 'out-and-back' }) {
+  const styles =
+    type === 'loop'         ? 'bg-blue-100 text-blue-700' :
+    type === 'out-and-back' ? 'bg-orange-100 text-orange-700' :
+                              'bg-purple-100 text-purple-700'
+  const label =
+    type === 'loop'         ? 'Loop' :
+    type === 'out-and-back' ? 'Out & Back' :
+                              'One-way'
   return (
-    <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${
-      type === 'loop'
-        ? 'bg-blue-100 text-blue-700'
-        : 'bg-purple-100 text-purple-700'
-    }`}>
-      {type === 'loop' ? 'Loop' : 'One-way'}
+    <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${styles}`}>
+      {label}
     </span>
   )
 }
@@ -252,7 +249,7 @@ export function RoutePlanner({ startPin, onClearPin, onRouteSelected, userId, on
                     <FreshnessBar percent={route.freshnessPercent} />
 
                     {isSelected && (
-                      <div className="mt-3 flex flex-col gap-1.5">
+                      <div className="mt-3">
                         <a
                           href={buildGoogleMapsUrl(route)}
                           target="_blank"
@@ -264,16 +261,6 @@ export function RoutePlanner({ startPin, onClearPin, onRouteSelected, userId, on
                             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                           </svg>
                           Open in Google Maps
-                        </a>
-                        <a
-                          href={buildAppleMapsUrl(route)}
-                          className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                          </svg>
-                          Open in Apple Maps
                         </a>
                       </div>
                     )}

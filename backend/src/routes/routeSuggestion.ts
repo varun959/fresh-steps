@@ -15,11 +15,43 @@ interface SuggestBody {
 }
 
 interface RouteResult {
-  type: 'loop' | 'one-way';
+  type: 'loop' | 'one-way' | 'out-and-back';
   geometry: { type: 'LineString'; coordinates: [number, number][] };
   distanceKm: number;
   durationMinutes: number;
   freshnessPercent: number;
+}
+
+/**
+ * For a loop candidate, check whether the route retraces the same road
+ * (out-and-back) vs. covering different roads (true loop).
+ *
+ * Splits the route at its midpoint, samples 6 points from the second half,
+ * and finds the minimum distance from each to any point on the first half.
+ * If the average minimum distance is < 50 m, the second half closely mirrors
+ * the first — it's an out-and-back route.
+ */
+function classifyLoopType(coords: [number, number][]): 'loop' | 'out-and-back' {
+  if (coords.length < 6) return 'loop';
+  const mid = Math.floor(coords.length / 2);
+  const firstHalf = coords.slice(0, mid);
+  const secondHalf = coords.slice(mid);
+
+  const step = Math.max(1, Math.floor(secondHalf.length / 6));
+  const samples = secondHalf.filter((_, i) => i % step === 0).slice(0, 6);
+
+  let totalMinDist = 0;
+  for (const [lng2, lat2] of samples) {
+    let minDist = Infinity;
+    for (const [lng1, lat1] of firstHalf) {
+      const dy = (lat2 - lat1) * 111320;
+      const dx = (lng2 - lng1) * 111320 * Math.cos((lat1 * Math.PI) / 180);
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < minDist) minDist = d;
+    }
+    totalMinDist += minDist;
+  }
+  return totalMinDist / samples.length < 50 ? 'out-and-back' : 'loop';
 }
 
 /**
@@ -133,8 +165,9 @@ router.post('/suggest', async (req: Request, res: Response) => {
           ? await scoreFreshness(coords, effectiveUserId).catch(() => 100)
           : 100;
 
+        const type = c.type === 'loop' ? classifyLoopType(coords) : c.type;
         return {
-          type: c.type,
+          type,
           geometry: { type: 'LineString' as const, coordinates: coords },
           distanceKm: Math.round(distanceKm * 10) / 10,
           durationMinutes: Math.round(durationSeconds / 60),
@@ -160,8 +193,9 @@ router.post('/suggest', async (req: Request, res: Response) => {
       for (const { c, coords, durationSeconds } of validRoutes.slice(0, 3)) {
         if (scored.some(s => s.geometry.coordinates === coords)) continue;
         const distanceKm = coordinatesToDistanceKm(coords);
+        const type = c.type === 'loop' ? classifyLoopType(coords) : c.type;
         scored.push({
-          type: c.type,
+          type,
           geometry: { type: 'LineString' as const, coordinates: coords },
           distanceKm: Math.round(distanceKm * 10) / 10,
           durationMinutes: Math.round(durationSeconds / 60),

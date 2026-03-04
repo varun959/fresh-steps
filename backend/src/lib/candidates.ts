@@ -8,7 +8,7 @@
 
 import type { Waypoint } from './valhalla';
 
-export type RouteType = 'loop' | 'one-way';
+export type RouteType = 'loop' | 'one-way' | 'out-and-back';
 
 export interface CandidateWaypoints {
   type: RouteType;
