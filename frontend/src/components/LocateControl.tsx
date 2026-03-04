@@ -13,7 +13,7 @@ export function LocateControl() {
     btn.style.cssText =
       'display:block;text-align:center;line-height:26px;'
     btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="vertical-align:middle">
+      stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="display:block;margin:5px auto">
       <circle cx="12" cy="12" r="4"/>
       <line x1="12" y1="2" x2="12" y2="6"/>
       <line x1="12" y1="18" x2="12" y2="22"/>
