@@ -88,12 +88,6 @@ export function useRoads({ userId, refreshKey }: UseRoadsOptions = {}) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
-  // Trigger initial load on mount
-  useEffect(() => {
-    fetchRoads(map)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   // Listen to map events
   useMapEvents({
     moveend: (e) => fetchRoads(e.target as LeafletMap),
