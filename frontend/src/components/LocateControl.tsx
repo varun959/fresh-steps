@@ -11,7 +11,7 @@ export function LocateControl() {
     btn.href = '#'
     btn.title = 'My location'
     btn.style.cssText =
-      'display:flex;align-items:center;justify-content:center;width:26px;height:26px;'
+      'display:block;line-height:26px;text-align:center;'
     btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"
       stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
       <circle cx="12" cy="12" r="4"/>
