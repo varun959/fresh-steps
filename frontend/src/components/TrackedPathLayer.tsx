@@ -28,7 +28,7 @@ export function TrackedPathLayer({ coords }: TrackedPathLayerProps) {
     const positions: [number, number][] = coords.map(([lng, lat]) => [lat, lng])
 
     polylineRef.current = L.polyline(positions, {
-      color: '#ea580c',
+      color: '#2563eb',
       weight: 4,
       opacity: 0.9,
     }).addTo(map)
@@ -36,8 +36,8 @@ export function TrackedPathLayer({ coords }: TrackedPathLayerProps) {
     const last = positions[positions.length - 1]
     markerRef.current = L.circleMarker(last, {
       radius: 8,
-      color: '#ea580c',
-      fillColor: '#ea580c',
+      color: '#2563eb',
+      fillColor: '#2563eb',
       fillOpacity: 1,
       weight: 2,
     }).addTo(map)
