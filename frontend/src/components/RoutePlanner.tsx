@@ -42,6 +42,7 @@ function buildGoogleMapsUrl(route: RouteResult): string {
 }
 
 function TypeBadge({ type }: { type: 'loop' | 'one-way' | 'out-and-back' }) {
+  const [open, setOpen] = useState(false)
   const styles =
     type === 'loop'         ? 'bg-blue-100 text-blue-700' :
     type === 'out-and-back' ? 'bg-orange-100 text-orange-700' :
@@ -59,8 +60,11 @@ function TypeBadge({ type }: { type: 'loop' | 'one-way' | 'out-and-back' }) {
       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${styles}`}>
         {label}
       </span>
-      <span className="text-gray-400 text-xs leading-none cursor-default">ⓘ</span>
-      <span className="pointer-events-none absolute bottom-full left-0 mb-1.5 w-48 rounded-lg bg-gray-800 text-white text-xs px-2.5 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg">
+      <span
+        className="text-gray-400 text-xs leading-none cursor-pointer"
+        onClick={(e) => { e.stopPropagation(); setOpen(o => !o) }}
+      >ⓘ</span>
+      <span className={`pointer-events-none absolute bottom-full left-0 mb-1.5 w-48 rounded-lg bg-gray-800 text-white text-xs px-2.5 py-1.5 z-50 shadow-lg transition-opacity ${open ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
         {tooltip}
       </span>
     </span>
