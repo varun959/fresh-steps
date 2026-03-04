@@ -45,13 +45,13 @@ router.post('/', async (req: Request, res: Response) => {
       RETURNING id, distance_meters
     `;
 
-    // Find nearby OSM ways within 15 metres of the walk
+    // Find nearby OSM ways within 8 metres of the walk
     const ways = await sql`
       SELECT
         id,
         ST_AsGeoJSON(geometry)::json AS geometry
       FROM osm_ways
-      WHERE ST_DWithin(geometry::geography, ST_GeomFromGeoJSON(${lineGeoJSON})::geography, 15)
+      WHERE ST_DWithin(geometry::geography, ST_GeomFromGeoJSON(${lineGeoJSON})::geography, 8)
     `;
 
     // Upsert covered_segments for both sides of each matched way
