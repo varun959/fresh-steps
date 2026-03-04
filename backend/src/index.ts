@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import morgan from 'morgan';
 import sql from './db';
 import coverageRouter from './routes/coverage';
 import routeSuggestionRouter from './routes/routeSuggestion';
@@ -12,6 +13,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
+app.use(morgan('short'));
 app.use(express.json());
 
 // Health check — verifies DB connectivity
