@@ -26,16 +26,29 @@ interface RouteResult {
  * For a loop candidate, check whether the route retraces the same road
  * (out-and-back) vs. covering different roads (true loop).
  *
- * Splits the route at its midpoint, samples 6 points from the second half,
- * and finds the minimum distance from each to any point on the first half.
- * If the average minimum distance is < 50 m, the second half closely mirrors
- * the first — it's an out-and-back route.
+ * Finds the actual turnaround point (coord furthest from start), splits there,
+ * and measures how close the return leg stays to the outbound leg.
+ * Threshold 20 m: same road's opposite sidewalk is ~10-15 m away;
+ * a genuine loop around a city block is typically 40-100 m wide.
  */
 function classifyLoopType(coords: [number, number][]): 'loop' | 'out-and-back' {
   if (coords.length < 6) return 'loop';
-  const mid = Math.floor(coords.length / 2);
-  const firstHalf = coords.slice(0, mid);
-  const secondHalf = coords.slice(mid);
+  const [startLng, startLat] = coords[0];
+
+  // Find the turnaround: the point furthest from start
+  let maxDist = 0;
+  let turnIdx = Math.floor(coords.length / 2);
+  for (let i = 1; i < coords.length - 1; i++) {
+    const [lng, lat] = coords[i];
+    const dy = (lat - startLat) * 111320;
+    const dx = (lng - startLng) * 111320 * Math.cos((startLat * Math.PI) / 180);
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d > maxDist) { maxDist = d; turnIdx = i; }
+  }
+
+  const firstHalf = coords.slice(0, turnIdx);
+  const secondHalf = coords.slice(turnIdx);
+  if (firstHalf.length < 2 || secondHalf.length < 2) return 'loop';
 
   const step = Math.max(1, Math.floor(secondHalf.length / 6));
   const samples = secondHalf.filter((_, i) => i % step === 0).slice(0, 6);
@@ -51,7 +64,7 @@ function classifyLoopType(coords: [number, number][]): 'loop' | 'out-and-back' {
     }
     totalMinDist += minDist;
   }
-  return totalMinDist / samples.length < 50 ? 'out-and-back' : 'loop';
+  return totalMinDist / samples.length < 20 ? 'out-and-back' : 'loop';
 }
 
 /**
@@ -206,7 +219,20 @@ router.post('/suggest', async (req: Request, res: Response) => {
   }
 
   scored.sort((a, b) => b.freshnessPercent - a.freshnessPercent);
-  const top3 = scored.slice(0, 3);
+
+  // 6. Pick one best of each type first, then fill remaining slots by freshness.
+  //    This ensures diversity: e.g. loop + one-way + out-and-back rather than
+  //    three loops even if loops dominate by freshness score.
+  const types: RouteResult['type'][] = ['loop', 'one-way', 'out-and-back'];
+  const top3: RouteResult[] = [];
+  for (const t of types) {
+    const best = scored.find(r => r.type === t);
+    if (best) top3.push(best);
+  }
+  for (const r of scored) {
+    if (top3.length >= 3) break;
+    if (!top3.includes(r)) top3.push(r);
+  }
 
   res.json({ routes: top3 });
 });

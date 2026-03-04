@@ -50,8 +50,15 @@ function TypeBadge({ type }: { type: 'loop' | 'one-way' | 'out-and-back' }) {
     type === 'loop'         ? 'Loop' :
     type === 'out-and-back' ? 'Out & Back' :
                               'One-way'
+  const tooltip =
+    type === 'out-and-back' ? 'Same road, both sidewalks — efficient when roads are limited' :
+    type === 'loop'         ? 'Circular route covering different roads each way' :
+                              'Point-to-point — end somewhere new'
   return (
-    <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${styles}`}>
+    <span
+      className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full cursor-default ${styles}`}
+      title={tooltip}
+    >
       {label}
     </span>
   )

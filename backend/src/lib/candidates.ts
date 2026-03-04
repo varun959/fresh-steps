@@ -2,7 +2,9 @@
  * Generates 16 candidate waypoint sets for route suggestion:
  *   8 compass directions × 2 shapes (loop + one-way)
  *
- * Loop:    [start, midpoint_at_half_distance_in_direction, start]
+ * Loop:    triangle [start, ptA, ptB, start] where ptA/ptB are at ±60° from
+ *          the target direction — forces Valhalla to use 3 different road legs
+ *          rather than reversing the same road (which [start, mid, start] does).
  * One-way: [start, endpoint_at_full_distance_in_direction]
  */
 
@@ -47,12 +49,15 @@ export function generateCandidates(
   for (let i = 0; i < 8; i++) {
     const angleDeg = i * 45;
 
-    // Loop: [start → mid → start].  Crow-flies to mid = (distKm/2) / ROAD_FACTOR
-    // so that the two road legs sum to ≈ distKm.
-    const mid = project(startLat, startLng, distKm / 2 / ROAD_FACTOR, angleDeg);
+    // Loop: triangle [start → ptA → ptB → start].
+    // ptA and ptB are at ±60° from angleDeg, each at distKm/3/ROAD_FACTOR crow-flies,
+    // so the three road legs sum to ≈ distKm.
+    const legDist = distKm / 3 / ROAD_FACTOR;
+    const ptA = project(startLat, startLng, legDist, (angleDeg - 60 + 360) % 360);
+    const ptB = project(startLat, startLng, legDist, (angleDeg + 60) % 360);
     candidates.push({
       type: 'loop',
-      waypoints: [start, mid, start],
+      waypoints: [start, ptA, ptB, start],
       direction: angleDeg,
     });
 
