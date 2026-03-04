@@ -1,6 +1,6 @@
 # Fresh Steps — Product Specification
 
-**Version:** 1.0
+**Version:** 0.5
 **Status:** MVP In Development
 **Last Updated:** March 4, 2026
 
@@ -27,7 +27,7 @@ Baar (Zug), Zurich, Bangalore, New York City (Manhattan). Expandable to any city
 | Route planning | App suggests routes, user picks | User wants the app to do the thinking |
 | Duration input | Time-based ("45 minutes") | More natural than distance-based |
 | Walking speed | ~5 km/h assumed | Can be personalized post-MVP |
-| Navigation | Handoff to Google/Apple Maps | Turn-by-turn is out of scope; delegate to native maps |
+| Navigation | Handoff to Google Maps | Turn-by-turn is out of scope; delegate to native maps |
 | Walk import | GPX export, manual import | Strava history is cycling-only; GPX gives portability |
 | ORM | None — postgres.js raw SQL | PostGIS spatial queries require raw SQL; one consistent pattern |
 | App type | PWA | One codebase, installable on home screen, good enough for MVP |
@@ -62,7 +62,7 @@ Coverage is tracked **per sidewalk side** (left/right), not per road. Walking on
 3. Each candidate is routed via Valhalla (Stadia Maps hosted) with pedestrian costing
 4. Freshness score: `(total_m - covered_m) / total_m × 100` via PostGIS `ST_Intersection`
 5. Top 3 routes by freshness are displayed with distance, duration, and freshness %
-6. User picks a route → opens Google Maps or Apple Maps for turn-by-turn navigation
+6. User picks a route → opens Google Maps for turn-by-turn navigation
 
 **API:** `POST /api/routes/suggest` — body: `{ startLat, startLng, durationMinutes, userId? }`
 
@@ -173,7 +173,7 @@ Database schema, backend scaffold (Express + postgres.js), frontend map shell (R
 Seeded OSM road network. `/api/roads` endpoint returns GeoJSON color-coded by coverage. Coverage map rendered with canvas renderer, debounced, min zoom 13.
 
 ### Phase 3 — Route Suggestion ✅
-Valhalla routing via Stadia Maps. 16 candidate routes (8 loops + 8 one-ways). Freshness scored against PostGIS covered_segments. Top-3 displayed in collapsible RoutePlanner panel. Handoff to Google/Apple Maps.
+Valhalla routing via Stadia Maps. 16 candidate routes (8 loops + 8 one-ways). Freshness scored against PostGIS covered_segments. Top-3 displayed in collapsible RoutePlanner panel. Handoff to Google Maps.
 
 ### Phase 4 — Walk Tracking ✅
 GPS walk tracking with `watchPosition`. Walk save API matches GPS to OSM ways within 8 m, upserts covered_segments per side. Blue polyline rendered live. Summary card with GPX download.
