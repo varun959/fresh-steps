@@ -39,6 +39,7 @@ const AREAS = [
     name: 'Zurich, Switzerland',
     bbox: '47.32,8.44,47.43,8.61',
   },
+  { name: 'Bangalore South', bbox: '12.80,77.52,12.86,77.72' },
   { name: 'Bangalore SW', bbox: '12.86,77.52,12.95,77.62' },
   { name: 'Bangalore SE', bbox: '12.86,77.62,12.95,77.72' },
   { name: 'Bangalore NW', bbox: '12.95,77.52,13.04,77.62' },
@@ -190,7 +191,8 @@ async function main() {
   const sql = postgres(connectionString, { ssl: 'require', max: 5 });
 
   let total = 0;
-  for (const area of AREAS) {
+  const areasToRun = process.env.SEED_AREAS ? AREAS.filter(a => process.env.SEED_AREAS!.split(',').some(n => a.name.includes(n))) : AREAS;
+  for (const area of areasToRun) {
     total += await seedArea(sql, area);
   }
 
