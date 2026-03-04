@@ -39,6 +39,11 @@ const AREAS = [
     name: 'Zurich, Switzerland',
     bbox: '47.32,8.44,47.43,8.61',
   },
+  { name: 'Bangalore SW', bbox: '12.86,77.52,12.95,77.62' },
+  { name: 'Bangalore SE', bbox: '12.86,77.62,12.95,77.72' },
+  { name: 'Bangalore NW', bbox: '12.95,77.52,13.04,77.62' },
+  { name: 'Bangalore NE-S', bbox: '12.95,77.62,13.00,77.72' },
+  { name: 'Bangalore NE-N', bbox: '13.00,77.62,13.04,77.72' },
 ];
 
 interface OverpassNode {
