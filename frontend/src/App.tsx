@@ -10,6 +10,7 @@ import { TrackedPathLayer } from './components/TrackedPathLayer'
 import { RoutePolyline } from './components/RoutePolyline'
 import { LocateControl } from './components/LocateControl'
 import { LocationSearch } from './components/LocationSearch'
+import { OnboardingCard } from './components/OnboardingCard'
 import type { RouteResult } from './hooks/useRouteSuggestion'
 
 // Fix Leaflet default marker icon broken by bundlers
@@ -227,6 +228,9 @@ function App() {
         userId={DEMO_USER_ID}
         onOpenChange={setPlannerOpen}
       />
+
+      {/* First-visit onboarding */}
+      <OnboardingCard />
 
       {/* API health badge */}
       <a
