@@ -26,6 +26,7 @@ export function WalkTracker({ userId, onCoordsChange, onWalkSaved }: WalkTracker
     startTracking,
     stopTracking,
     dismissSummary,
+    discardWalk,
   } = useWalkTracking(userId)
 
   useEffect(() => {
@@ -143,12 +144,20 @@ export function WalkTracker({ userId, onCoordsChange, onWalkSaved }: WalkTracker
         Download GPX
       </a>
 
-      <button
-        onClick={dismissSummary}
-        className="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold text-sm py-2 rounded-xl transition-colors"
-      >
-        Done
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={() => discardWalk(summary.walkId)}
+          className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold text-sm py-2 rounded-xl transition-colors"
+        >
+          Discard
+        </button>
+        <button
+          onClick={dismissSummary}
+          className="flex-1 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold text-sm py-2 rounded-xl transition-colors"
+        >
+          Done
+        </button>
+      </div>
     </div>
   )
 }

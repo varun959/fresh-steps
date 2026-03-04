@@ -130,6 +130,11 @@ export function useWalkTracking(userId?: string) {
     setState('idle')
   }, [])
 
+  const discardWalk = useCallback(async (walkId: string) => {
+    await fetch(`${API_URL}/api/walks/${walkId}`, { method: 'DELETE' }).catch(() => {})
+    dismissSummary()
+  }, [dismissSummary])
+
   // Cleanup on unmount
   useEffect(() => {
     return clearWatch
@@ -147,5 +152,6 @@ export function useWalkTracking(userId?: string) {
     startTracking,
     stopTracking,
     dismissSummary,
+    discardWalk,
   }
 }

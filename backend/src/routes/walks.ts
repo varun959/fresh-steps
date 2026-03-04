@@ -91,4 +91,19 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
+// DELETE /api/walks/:id
+// Removes the walk and its covered_segments (cleanup for test/bad recordings)
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await sql`DELETE FROM covered_segments WHERE walk_id = ${id}::uuid`;
+    const [deleted] = await sql`DELETE FROM walks WHERE id = ${id}::uuid RETURNING id`;
+    if (!deleted) return res.status(404).json({ error: 'Walk not found' });
+    res.json({ deleted: deleted.id });
+  } catch (err) {
+    console.error('Walk delete error:', err);
+    res.status(500).json({ error: 'Failed to delete walk' });
+  }
+});
+
 export default router;
