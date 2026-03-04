@@ -12,9 +12,9 @@ import { useRoads, type RoadsGeoJSON } from '../hooks/useRoads'
 import { Legend } from './Legend'
 
 const STATUS_COLOR: Record<string, string> = {
-  fresh:   '#16a34a', // green-600
+  fresh:   '#dc2626', // red-600
   partial: '#ca8a04', // yellow-600
-  covered: '#6b7280', // gray-500
+  covered: '#16a34a', // green-600
 }
 
 function roadWeight(highway: string): number {
