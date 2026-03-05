@@ -200,6 +200,7 @@ UI/UX refinement, performance optimization, mobile experience polish, bug fixes.
 - Personalized pace calibration
 - Transit-aware routing (ending near specific tram stops)
 - Native iOS/Android app
+- **Vector tile rendering:** Replace Leaflet + raster tiles + GeoJSON overlay with MapLibre GL + OpenFreeMap vector tiles. Coverage status would be applied as style filters on the vector tile layer by OSM way ID, eliminating the `/api/roads` GeoJSON endpoint and the need to store full geometries in `osm_ways`. Significant rewrite but would yield GPU-accelerated rendering and a much smaller DB footprint.
 
 ---
 
