@@ -65,8 +65,12 @@ function AutoLocate({ onLocated }: { onLocated: () => void }) {
   useEffect(() => {
     if (firedRef.current || !navigator.geolocation) return
     firedRef.current = true
+    // Capture the center at mount so we can check if the user panned before GPS resolved
+    const initialCenter = map.getCenter()
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        // If the user has already panned away, don't snap back
+        if (map.distance(map.getCenter(), initialCenter) > 100) return
         map.setView([pos.coords.latitude, pos.coords.longitude], 15)
         onLocated()
       },
