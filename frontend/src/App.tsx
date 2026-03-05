@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -61,8 +61,10 @@ function CaptureMap() {
  */
 function AutoLocate({ onLocated }: { onLocated: () => void }) {
   const map = useMap()
+  const firedRef = useRef(false)
   useEffect(() => {
-    if (!navigator.geolocation) return
+    if (firedRef.current || !navigator.geolocation) return
+    firedRef.current = true
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         map.setView([pos.coords.latitude, pos.coords.longitude], 15)

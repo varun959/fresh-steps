@@ -73,6 +73,7 @@ export function useWalkTracking(userId?: string) {
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
+        if (pos.coords.accuracy > 50) return
         const newCoord: [number, number] = [pos.coords.longitude, pos.coords.latitude]
         const last = coordsRef.current.at(-1)
         if (!last || haversineMeters(last, newCoord) > 10) {
