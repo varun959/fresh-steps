@@ -45,13 +45,23 @@ router.post('/', async (req: Request, res: Response) => {
       RETURNING id, distance_meters
     `;
 
-    // Find nearby OSM ways within 8 metres of the walk
+    // Find OSM ways within 8m of the walk that also overlap the buffer for at least 20m.
+    // The proximity check alone would match cross-streets at every intersection (they pass
+    // within 8m of the path). The overlap-length check filters those out: a perpendicular
+    // cross-street only intersects the 8m buffer for ~16m, while a road actually walked
+    // along overlaps for the full length of the segment.
     const ways = await sql`
       SELECT
         id,
         ST_AsGeoJSON(geometry)::json AS geometry
       FROM osm_ways
       WHERE ST_DWithin(geometry::geography, ST_GeomFromGeoJSON(${lineGeoJSON})::geography, 8)
+        AND ST_Length(
+          ST_Intersection(
+            ST_Buffer(ST_GeomFromGeoJSON(${lineGeoJSON})::geography, 8)::geometry,
+            geometry
+          )::geography
+        ) > 20
     `;
 
     // Upsert covered_segments for both sides of each matched way
