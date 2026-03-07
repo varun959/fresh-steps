@@ -40,12 +40,21 @@ function totalDistanceKm(coords: [number, number][]): number {
   return total / 1000
 }
 
+export interface RawPosition {
+  lat: number
+  lng: number
+  accuracy: number
+  accepted: boolean
+}
+
 export function useWalkTracking(userId?: string) {
   const [state, setState] = useState<WalkState>('idle')
   const [coords, setCoords] = useState<[number, number][]>([])
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [summary, setSummary] = useState<WalkSummary | null>(null)
+  const [rawPosition, setRawPosition] = useState<RawPosition | null>(null)
+  const [debugLog, setDebugLog] = useState<RawPosition[]>([])
 
   const coordsRef = useRef<[number, number][]>([])
   const watchIdRef = useRef<number | null>(null)
@@ -65,8 +74,14 @@ export function useWalkTracking(userId?: string) {
 
   // Shared position handler — used by both startTracking and the restore-on-mount effect
   const handlePosition = useCallback((pos: GeolocationPosition) => {
-    if (pos.coords.accuracy > 150) return
-    const newCoord: [number, number] = [pos.coords.longitude, pos.coords.latitude]
+    const { latitude: lat, longitude: lng, accuracy } = pos.coords
+    const rejected = accuracy > 150
+    const raw: RawPosition = { lat, lng, accuracy, accepted: !rejected }
+    setRawPosition(raw)
+    setDebugLog(log => [...log.slice(-49), raw]) // keep last 50 entries
+
+    if (rejected) return
+    const newCoord: [number, number] = [lng, lat]
     const last = coordsRef.current.at(-1)
     if (!last || haversineMeters(last, newCoord) > 10) {
       coordsRef.current = [...coordsRef.current, newCoord]
@@ -188,6 +203,8 @@ export function useWalkTracking(userId?: string) {
     distanceKm,
     error,
     summary,
+    rawPosition,
+    debugLog,
     startTracking,
     stopTracking,
     dismissSummary,

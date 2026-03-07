@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
-import { useWalkTracking } from '../hooks/useWalkTracking'
+import { useWalkTracking, type RawPosition } from '../hooks/useWalkTracking'
+
+const DEBUG = new URLSearchParams(window.location.search).get('debug') === '1'
 
 const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -13,9 +15,10 @@ interface WalkTrackerProps {
   userId?: string
   onCoordsChange: (coords: [number, number][]) => void
   onWalkSaved: () => void
+  onRawPosition?: (pos: RawPosition | null) => void
 }
 
-export function WalkTracker({ userId, onCoordsChange, onWalkSaved }: WalkTrackerProps) {
+export function WalkTracker({ userId, onCoordsChange, onWalkSaved, onRawPosition }: WalkTrackerProps) {
   const {
     state,
     coords,
@@ -23,6 +26,8 @@ export function WalkTracker({ userId, onCoordsChange, onWalkSaved }: WalkTracker
     distanceKm,
     error,
     summary,
+    rawPosition,
+    debugLog,
     startTracking,
     stopTracking,
     dismissSummary,
@@ -37,22 +42,52 @@ export function WalkTracker({ userId, onCoordsChange, onWalkSaved }: WalkTracker
     if (state === 'done') onWalkSaved()
   }, [state, onWalkSaved])
 
+  useEffect(() => {
+    onRawPosition?.(rawPosition)
+  }, [rawPosition, onRawPosition])
+
+  const debugOverlay = DEBUG && state === 'tracking' && (
+    <div
+      style={{ zIndex: 1100, top: '4rem', right: '1rem', maxHeight: '60vh', overflowY: 'auto' }}
+      className="absolute bg-black/80 text-green-400 font-mono text-xs rounded-xl p-3 w-64 space-y-1"
+    >
+      <div className="font-bold text-green-300 mb-1">GPS Debug</div>
+      {rawPosition && (
+        <div className={rawPosition.accepted ? 'text-green-400' : 'text-red-400'}>
+          ● {rawPosition.accepted ? 'accepted' : 'rejected'} acc={rawPosition.accuracy.toFixed(0)}m
+          <br />{rawPosition.lat.toFixed(6)}, {rawPosition.lng.toFixed(6)}
+        </div>
+      )}
+      <div className="border-t border-green-900 pt-1 mt-1 text-green-600">Last {debugLog.length} reads:</div>
+      {[...debugLog].reverse().map((r, i) => (
+        <div key={i} className={r.accepted ? 'text-green-400' : 'text-red-500'}>
+          {r.accepted ? '✓' : '✗'} {r.accuracy.toFixed(0)}m
+        </div>
+      ))}
+    </div>
+  )
+
   if (state === 'idle') {
     return (
-      <button
-        onClick={startTracking}
-        style={{ zIndex: 1000, bottom: '10rem', left: '1rem' }}
-        className="absolute flex items-center gap-2 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold text-sm px-4 py-3 rounded-full shadow-lg transition-colors"
-        aria-label="Start Walk"
-      >
-        <span>🦶</span>
-        Start Walk
-      </button>
+      <>
+        {debugOverlay}
+        <button
+          onClick={startTracking}
+          style={{ zIndex: 1000, bottom: '10rem', left: '1rem' }}
+          className="absolute flex items-center gap-2 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold text-sm px-4 py-3 rounded-full shadow-lg transition-colors"
+          aria-label="Start Walk"
+        >
+          <span>🦶</span>
+          Start Walk
+        </button>
+      </>
     )
   }
 
   if (state === 'tracking') {
     return (
+      <>
+      {debugOverlay}
       <div
         style={{ zIndex: 1000, bottom: '1rem', left: '1rem' }}
         className="absolute bg-white rounded-2xl shadow-xl p-4 w-56"
@@ -99,6 +134,7 @@ export function WalkTracker({ userId, onCoordsChange, onWalkSaved }: WalkTracker
           </div>
         )}
       </div>
+      </>
     )
   }
 

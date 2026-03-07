@@ -12,6 +12,7 @@ import { LocateControl } from './components/LocateControl'
 import { LocationSearch } from './components/LocationSearch'
 import { OnboardingCard } from './components/OnboardingCard'
 import type { RouteResult } from './hooks/useRouteSuggestion'
+import type { RawPosition } from './hooks/useWalkTracking'
 
 // Fix Leaflet default marker icon broken by bundlers
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
@@ -85,6 +86,32 @@ function AutoLocate({ onLocated }: { onLocated: () => void }) {
  * Captures map clicks to place/move the start pin.
  * Must be rendered inside <MapContainer>.
  */
+/**
+ * Shows a semi-transparent accuracy circle around the last raw GPS fix while tracking.
+ * Helps visualise GPS drift and signal quality during a walk.
+ */
+function AccuracyCircle({ position }: { position: RawPosition | null }) {
+  const map = useMap()
+  const circleRef = useRef<L.Circle | null>(null)
+
+  useEffect(() => {
+    if (circleRef.current) { circleRef.current.remove(); circleRef.current = null }
+    if (!position) return
+    const color = position.accuracy < 20 ? '#16a34a' : position.accuracy < 50 ? '#ca8a04' : '#dc2626'
+    circleRef.current = L.circle([position.lat, position.lng], {
+      radius: position.accuracy,
+      color,
+      fillColor: color,
+      fillOpacity: 0.08,
+      weight: 1,
+      opacity: 0.4,
+    }).addTo(map)
+    return () => { circleRef.current?.remove(); circleRef.current = null }
+  }, [position, map])
+
+  return null
+}
+
 function MapClickHandler({
   onMapClick,
 }: {
@@ -106,6 +133,7 @@ function App() {
   const [walkRefreshKey, setWalkRefreshKey] = useState(0)
   const [cityLabel, setCityLabel] = useState('Baar, Switzerland')
   const [located, setLocated] = useState(false)
+  const [rawPosition, setRawPosition] = useState<RawPosition | null>(null)
 
   const handleWalkSaved = useCallback(() => {
     setWalkRefreshKey(k => k + 1)
@@ -217,6 +245,9 @@ function App() {
 
         {/* Tracked walk path */}
         {walkCoords.length > 0 && <TrackedPathLayer coords={walkCoords} />}
+
+        {/* Accuracy circle — shows GPS signal quality during tracking */}
+        <AccuracyCircle position={rawPosition} />
       </MapContainer>
 
       {/* Walk Tracker FAB / panel */}
@@ -224,6 +255,7 @@ function App() {
         userId={DEMO_USER_ID}
         onCoordsChange={setWalkCoords}
         onWalkSaved={handleWalkSaved}
+        onRawPosition={setRawPosition}
       />
 
       {/* Route Planner panel / FAB */}
