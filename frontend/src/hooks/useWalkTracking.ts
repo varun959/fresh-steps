@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { haversineMeters, isAccuracyAcceptable, isFarEnough, totalDistanceKm } from '../lib/gps'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const WALK_STORAGE_KEY = 'fresh-steps-walk-in-progress'
@@ -22,23 +23,6 @@ export interface WalkSummary {
   coveredWayCount: number
 }
 
-function haversineMeters([lng1, lat1]: [number, number], [lng2, lat2]: [number, number]): number {
-  const R = 6371000
-  const dLat = ((lat2 - lat1) * Math.PI) / 180
-  const dLng = ((lng2 - lng1) * Math.PI) / 180
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
-
-function totalDistanceKm(coords: [number, number][]): number {
-  let total = 0
-  for (let i = 1; i < coords.length; i++) {
-    total += haversineMeters(coords[i - 1], coords[i])
-  }
-  return total / 1000
-}
 
 export interface RawPosition {
   lat: number
@@ -75,15 +59,15 @@ export function useWalkTracking(userId?: string) {
   // Shared position handler — used by both startTracking and the restore-on-mount effect
   const handlePosition = useCallback((pos: GeolocationPosition) => {
     const { latitude: lat, longitude: lng, accuracy } = pos.coords
-    const rejected = accuracy > 150
-    const raw: RawPosition = { lat, lng, accuracy, accepted: !rejected }
+    const accepted = isAccuracyAcceptable(accuracy)
+    const raw: RawPosition = { lat, lng, accuracy, accepted }
     setRawPosition(raw)
     setDebugLog(log => [...log.slice(-49), raw]) // keep last 50 entries
 
-    if (rejected) return
+    if (!accepted) return
     const newCoord: [number, number] = [lng, lat]
     const last = coordsRef.current.at(-1)
-    if (!last || haversineMeters(last, newCoord) > 10) {
+    if (isFarEnough(newCoord, last)) {
       coordsRef.current = [...coordsRef.current, newCoord]
       setCoords([...coordsRef.current])
       // Persist to localStorage so a page reload can recover the walk
