@@ -89,7 +89,7 @@ interface CoverageMapProps {
 
 export function CoverageMap({ userId, refreshKey }: CoverageMapProps) {
   const { roads, loading, error, zoom, minZoom } = useRoads({ userId, refreshKey })
-  const [showFresh, setShowFresh] = useState(true)
+  const [showFresh, setShowFresh] = useState(false)
 
   return (
     <>
