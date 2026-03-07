@@ -1,6 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const WALK_STORAGE_KEY = 'fresh-steps-walk-in-progress'
+
+function saveWalkToStorage(coords: [number, number][], startedAt: string) {
+  try {
+    localStorage.setItem(WALK_STORAGE_KEY, JSON.stringify({ coords, startedAt }))
+  } catch {}
+}
+
+function clearWalkFromStorage() {
+  localStorage.removeItem(WALK_STORAGE_KEY)
+}
 
 export type WalkState = 'idle' | 'tracking' | 'saving' | 'done'
 
@@ -52,6 +63,30 @@ export function useWalkTracking(userId?: string) {
     }
   }, [])
 
+  // Shared position handler — used by both startTracking and the restore-on-mount effect
+  const handlePosition = useCallback((pos: GeolocationPosition) => {
+    if (pos.coords.accuracy > 150) return
+    const newCoord: [number, number] = [pos.coords.longitude, pos.coords.latitude]
+    const last = coordsRef.current.at(-1)
+    if (!last || haversineMeters(last, newCoord) > 10) {
+      coordsRef.current = [...coordsRef.current, newCoord]
+      setCoords([...coordsRef.current])
+      // Persist to localStorage so a page reload can recover the walk
+      if (startedAtRef.current) saveWalkToStorage(coordsRef.current, startedAtRef.current)
+    }
+  }, [])
+
+  const beginWatchAndTimer = useCallback((startMs: number) => {
+    timerRef.current = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startMs) / 1000))
+    }, 1000)
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      handlePosition,
+      (err) => { setError(`GPS error: ${err.message}`) },
+      { enableHighAccuracy: true, maximumAge: 5000 }
+    )
+  }, [handlePosition])
+
   const startTracking = useCallback(() => {
     if (!navigator.geolocation) {
       setError('Geolocation is not supported by this browser')
@@ -64,28 +99,28 @@ export function useWalkTracking(userId?: string) {
     setError(null)
     setSummary(null)
     startedAtRef.current = new Date().toISOString()
+    clearWalkFromStorage()
     setState('tracking')
+    beginWatchAndTimer(Date.now())
+  }, [beginWatchAndTimer])
 
-    const startMs = Date.now()
-    timerRef.current = setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - startMs) / 1000))
-    }, 1000)
-
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        if (pos.coords.accuracy > 150) return
-        const newCoord: [number, number] = [pos.coords.longitude, pos.coords.latitude]
-        const last = coordsRef.current.at(-1)
-        if (!last || haversineMeters(last, newCoord) > 10) {
-          coordsRef.current = [...coordsRef.current, newCoord]
-          setCoords([...coordsRef.current])
-        }
-      },
-      (err) => {
-        setError(`GPS error: ${err.message}`)
-      },
-      { enableHighAccuracy: true, maximumAge: 5000 }
-    )
+  // On mount: restore an in-progress walk if the page reloaded mid-walk
+  useEffect(() => {
+    const saved = localStorage.getItem(WALK_STORAGE_KEY)
+    if (!saved) return
+    try {
+      const { coords: savedCoords, startedAt } = JSON.parse(saved) as {
+        coords: [number, number][]
+        startedAt: string
+      }
+      if (savedCoords.length < 2 || !navigator.geolocation) return
+      coordsRef.current = savedCoords
+      setCoords(savedCoords)
+      startedAtRef.current = startedAt
+      setState('tracking')
+      beginWatchAndTimer(new Date(startedAt).getTime())
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const stopTracking = useCallback(async () => {
@@ -101,6 +136,7 @@ export function useWalkTracking(userId?: string) {
     }
 
     setState('saving')
+    clearWalkFromStorage()
     try {
       const res = await fetch(`${API_URL}/api/walks`, {
         method: 'POST',
@@ -123,6 +159,7 @@ export function useWalkTracking(userId?: string) {
   }, [userId, clearWatch])
 
   const dismissSummary = useCallback(() => {
+    clearWalkFromStorage()
     coordsRef.current = []
     setCoords([])
     setElapsedSeconds(0)
@@ -132,6 +169,7 @@ export function useWalkTracking(userId?: string) {
   }, [])
 
   const discardWalk = useCallback(async (walkId: string) => {
+    clearWalkFromStorage()
     await fetch(`${API_URL}/api/walks/${walkId}`, { method: 'DELETE' }).catch(() => {})
     dismissSummary()
   }, [dismissSummary])

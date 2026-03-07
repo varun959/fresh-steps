@@ -5,7 +5,7 @@
  * renders them as color-coded polylines via Leaflet Canvas, and shows
  * the Legend. Both components share the same road-fetch state.
  */
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { useRoads, type RoadsGeoJSON } from '../hooks/useRoads'
@@ -30,10 +30,11 @@ function roadWeight(highway: string): number {
   }
 }
 
-function RoadsLayer({ roads, zoom, minZoom }: {
+function RoadsLayer({ roads, zoom, minZoom, showFresh }: {
   roads: RoadsGeoJSON | null
   zoom: number
   minZoom: number
+  showFresh: boolean
 }) {
   const map = useMap()
   const layerRef = useRef<L.GeoJSON | null>(null)
@@ -44,6 +45,11 @@ function RoadsLayer({ roads, zoom, minZoom }: {
       layerRef.current = null
     }
     if (!roads || zoom < minZoom) return
+
+
+    const visibleRoads = showFresh
+      ? roads
+      : { ...roads, features: roads.features.filter(f => f.properties?.status !== 'fresh') }
 
     const renderer = L.canvas({ padding: 0.5 })
 
@@ -67,11 +73,11 @@ function RoadsLayer({ roads, zoom, minZoom }: {
       },
     }
 
-    const layer = L.geoJSON(roads as unknown as GeoJSON.FeatureCollection, geoJsonOptions)
+    const layer = L.geoJSON(visibleRoads as unknown as GeoJSON.FeatureCollection, geoJsonOptions)
     layer.addTo(map)
     layerRef.current = layer
     return () => { layer.remove() }
-  }, [roads, map, zoom, minZoom])
+  }, [roads, map, zoom, minZoom, showFresh])
 
   return null
 }
@@ -83,15 +89,18 @@ interface CoverageMapProps {
 
 export function CoverageMap({ userId, refreshKey }: CoverageMapProps) {
   const { roads, loading, error, zoom, minZoom } = useRoads({ userId, refreshKey })
+  const [showFresh, setShowFresh] = useState(true)
 
   return (
     <>
-      <RoadsLayer roads={roads} zoom={zoom} minZoom={minZoom} />
+      <RoadsLayer roads={roads} zoom={zoom} minZoom={minZoom} showFresh={showFresh} />
       <Legend
         loading={loading}
         zoom={zoom}
         minZoom={minZoom}
         roadCount={roads?.features.length ?? 0}
+        showFresh={showFresh}
+        onToggleFresh={() => setShowFresh(v => !v)}
       />
       {error && (
         <div
