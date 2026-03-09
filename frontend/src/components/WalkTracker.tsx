@@ -75,7 +75,7 @@ export function WalkTracker({ userId, onCoordsChange, onWalkSaved, onRawPosition
         {debugOverlay}
         <button
           onClick={startTracking}
-          style={{ zIndex: 1000, bottom: '10rem', left: '1rem' }}
+          style={{ zIndex: 1000, bottom: '13rem', left: '1rem' }}
           className="absolute flex items-center gap-2 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold text-sm px-4 py-3 rounded-full shadow-lg transition-colors"
           aria-label="Start Walk"
         >
