@@ -28,9 +28,11 @@ export function WalkTracker({ userId, onCoordsChange, onWalkSaved, onRawPosition
     summary,
     rawPosition,
     debugLog,
+    screenLockWarning,
     startTracking,
     stopTracking,
     dismissSummary,
+    dismissScreenLockWarning,
     discardWalk,
   } = useWalkTracking(userId)
 
@@ -105,6 +107,17 @@ export function WalkTracker({ userId, onCoordsChange, onWalkSaved, onRawPosition
         </div>
         <div className="text-sm text-gray-500 mb-1">{distanceKm.toFixed(2)} km</div>
         <div className="text-xs text-gray-400 mb-3">{coords.length} GPS points</div>
+
+        {screenLockWarning && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-2 mb-2 flex items-start gap-2">
+            <span className="text-amber-500 text-sm shrink-0 mt-0.5">⚠</span>
+            <div className="flex-1">
+              <p className="text-xs text-amber-800 font-medium">GPS paused while screen was locked</p>
+              <p className="text-xs text-amber-600 mt-0.5">Keep screen on for accurate tracking.</p>
+            </div>
+            <button onClick={dismissScreenLockWarning} className="text-amber-400 hover:text-amber-600 text-sm shrink-0">✕</button>
+          </div>
+        )}
 
         {error && (
           <div className="text-xs text-red-600 mb-2">{error}</div>

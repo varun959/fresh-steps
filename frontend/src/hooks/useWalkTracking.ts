@@ -39,11 +39,16 @@ export function useWalkTracking(userId?: string) {
   const [summary, setSummary] = useState<WalkSummary | null>(null)
   const [rawPosition, setRawPosition] = useState<RawPosition | null>(null)
   const [debugLog, setDebugLog] = useState<RawPosition[]>([])
+  // True when screen was locked and a GPS gap was detected (Wake Lock unavailable/released)
+  const [screenLockWarning, setScreenLockWarning] = useState(false)
 
   const coordsRef = useRef<[number, number][]>([])
   const watchIdRef = useRef<number | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const startedAtRef = useRef<string | null>(null)
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null)
+  // Timestamp of last accepted GPS fix — used to detect gaps when screen unlocks
+  const lastPositionTimeRef = useRef<number | null>(null)
 
   const clearWatch = useCallback(() => {
     if (watchIdRef.current !== null) {
@@ -54,6 +59,9 @@ export function useWalkTracking(userId?: string) {
       clearInterval(timerRef.current)
       timerRef.current = null
     }
+    // Release screen wake lock when tracking stops
+    wakeLockRef.current?.release().catch(() => {})
+    wakeLockRef.current = null
   }, [])
 
   // Shared position handler — used by both startTracking and the restore-on-mount effect
@@ -65,6 +73,7 @@ export function useWalkTracking(userId?: string) {
     setDebugLog(log => [...log.slice(-49), raw]) // keep last 50 entries
 
     if (!accepted) return
+    lastPositionTimeRef.current = Date.now()
     const newCoord: [number, number] = [lng, lat]
     const last = coordsRef.current.at(-1)
     if (isFarEnough(newCoord, last)) {
@@ -72,6 +81,15 @@ export function useWalkTracking(userId?: string) {
       setCoords([...coordsRef.current])
       // Persist to localStorage so a page reload can recover the walk
       if (startedAtRef.current) saveWalkToStorage(coordsRef.current, startedAtRef.current)
+    }
+  }, [])
+
+  const acquireWakeLock = useCallback(async () => {
+    if (!('wakeLock' in navigator)) return
+    try {
+      wakeLockRef.current = await navigator.wakeLock.request('screen')
+    } catch {
+      // Wake Lock denied (e.g. battery saver mode) — screen may still lock, warning will fire
     }
   }, [])
 
@@ -84,7 +102,8 @@ export function useWalkTracking(userId?: string) {
       (err) => { setError(`GPS error: ${err.message}`) },
       { enableHighAccuracy: true, maximumAge: 5000 }
     )
-  }, [handlePosition])
+    void acquireWakeLock()
+  }, [handlePosition, acquireWakeLock])
 
   const startTracking = useCallback(() => {
     if (!navigator.geolocation) {
@@ -121,6 +140,24 @@ export function useWalkTracking(userId?: string) {
     } catch {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Page Visibility API: while tracking, re-acquire Wake Lock after screen unlock
+  // and warn the user if GPS was paused (gap > 30s, meaning Wake Lock wasn't available)
+  useEffect(() => {
+    if (state !== 'tracking') return
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return
+      // Re-acquire wake lock — it's automatically released when the tab goes hidden
+      void acquireWakeLock()
+      // If it's been > 30s since the last GPS fix, screen was locked without Wake Lock
+      const lastTime = lastPositionTimeRef.current
+      if (lastTime !== null && Date.now() - lastTime > 30_000) {
+        setScreenLockWarning(true)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [state, acquireWakeLock])
 
   const stopTracking = useCallback(async () => {
     clearWatch()
@@ -164,8 +201,11 @@ export function useWalkTracking(userId?: string) {
     setElapsedSeconds(0)
     setError(null)
     setSummary(null)
+    setScreenLockWarning(false)
     setState('idle')
   }, [])
+
+  const dismissScreenLockWarning = useCallback(() => setScreenLockWarning(false), [])
 
   const discardWalk = useCallback(async (walkId: string) => {
     clearWalkFromStorage()
@@ -189,9 +229,11 @@ export function useWalkTracking(userId?: string) {
     summary,
     rawPosition,
     debugLog,
+    screenLockWarning,
     startTracking,
     stopTracking,
     dismissSummary,
+    dismissScreenLockWarning,
     discardWalk,
   }
 }
