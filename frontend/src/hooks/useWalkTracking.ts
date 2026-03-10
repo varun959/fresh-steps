@@ -41,6 +41,8 @@ export function useWalkTracking(userId?: string) {
   const [debugLog, setDebugLog] = useState<RawPosition[]>([])
   // True when screen was locked and a GPS gap was detected (Wake Lock unavailable/released)
   const [screenLockWarning, setScreenLockWarning] = useState(false)
+  // True while the Screen Wake Lock sentinel is held (screen won't auto-sleep)
+  const [wakeLockActive, setWakeLockActive] = useState(false)
 
   const coordsRef = useRef<[number, number][]>([])
   const watchIdRef = useRef<number | null>(null)
@@ -62,6 +64,7 @@ export function useWalkTracking(userId?: string) {
     // Release screen wake lock when tracking stops
     wakeLockRef.current?.release().catch(() => {})
     wakeLockRef.current = null
+    setWakeLockActive(false)
   }, [])
 
   // Shared position handler — used by both startTracking and the restore-on-mount effect
@@ -87,9 +90,14 @@ export function useWalkTracking(userId?: string) {
   const acquireWakeLock = useCallback(async () => {
     if (!('wakeLock' in navigator)) return
     try {
-      wakeLockRef.current = await navigator.wakeLock.request('screen')
+      const sentinel = await navigator.wakeLock.request('screen')
+      wakeLockRef.current = sentinel
+      setWakeLockActive(true)
+      // OS can revoke the lock (e.g. battery saver kicks in) — update indicator immediately
+      sentinel.addEventListener('release', () => setWakeLockActive(false), { once: true })
     } catch {
       // Wake Lock denied (e.g. battery saver mode) — screen may still lock, warning will fire
+      setWakeLockActive(false)
     }
   }, [])
 
@@ -230,6 +238,7 @@ export function useWalkTracking(userId?: string) {
     rawPosition,
     debugLog,
     screenLockWarning,
+    wakeLockActive,
     startTracking,
     stopTracking,
     dismissSummary,

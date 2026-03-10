@@ -29,6 +29,7 @@ export function WalkTracker({ userId, onCoordsChange, onWalkSaved, onRawPosition
     rawPosition,
     debugLog,
     screenLockWarning,
+    wakeLockActive,
     startTracking,
     stopTracking,
     dismissSummary,
@@ -94,12 +95,21 @@ export function WalkTracker({ userId, onCoordsChange, onWalkSaved, onRawPosition
         style={{ zIndex: 1000, bottom: '1rem', left: '1rem' }}
         className="absolute bg-white rounded-2xl shadow-xl p-4 w-56"
       >
-        <div className="flex items-center gap-2 mb-3">
-          <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+            </span>
+            <span className="text-sm font-semibold text-gray-800">Recording…</span>
+          </div>
+          {/* Wake Lock indicator — green: screen won't sleep; amber: no lock, switching apps pauses GPS */}
+          <span
+            title={wakeLockActive ? 'Screen stay-awake active — keep app open' : 'Screen may sleep — keep app open and screen on'}
+            className={`text-xs font-medium px-2 py-0.5 rounded-full ${wakeLockActive ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}
+          >
+            {wakeLockActive ? '☀ screen on' : '⚠ screen off risk'}
           </span>
-          <span className="text-sm font-semibold text-gray-800">Recording…</span>
         </div>
 
         <div className="text-3xl font-mono font-bold text-gray-900 mb-1">
