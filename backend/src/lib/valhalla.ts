@@ -54,18 +54,22 @@ export interface RouteResult {
   durationSeconds: number;    // Valhalla's own pedestrian time estimate
 }
 
+/** Decode a Valhalla trip object (multi-leg) into a RouteResult. */
+function decodeTrip(trip: { legs: Array<{ shape: string }>; summary: { time: number } }): RouteResult {
+  const allCoords: [number, number][] = [];
+  for (let i = 0; i < trip.legs.length; i++) {
+    const legCoords = decodePolyline(trip.legs[i].shape);
+    allCoords.push(...(i === 0 ? legCoords : legCoords.slice(1)));
+  }
+  return { coords: allCoords, durationSeconds: Math.round(trip.summary.time) };
+}
+
 /**
  * Fetch a pedestrian route from Stadia Maps Valhalla.
  */
 export async function fetchRoute(waypoints: Waypoint[], apiKey: string): Promise<RouteResult> {
-  const locations = waypoints.map((wp) => ({
-    lon: wp.lng,
-    lat: wp.lat,
-    type: 'break',
-  }));
-
   const body = {
-    locations,
+    locations: waypoints.map((wp) => ({ lon: wp.lng, lat: wp.lat, type: 'break' })),
     costing: 'pedestrian',
     directions_options: { units: 'km' },
   };
@@ -84,18 +88,52 @@ export async function fetchRoute(waypoints: Waypoint[], apiKey: string): Promise
   }
 
   const data = await response.json() as {
-    trip: {
-      legs: Array<{ shape: string }>;
-      summary: { length: number; time: number };
-    };
+    trip: { legs: Array<{ shape: string }>; summary: { length: number; time: number } };
   };
 
-  // Each leg has its own independently-encoded polyline — decode separately,
-  // then concatenate (dropping the duplicate first point on subsequent legs).
-  const allCoords: [number, number][] = [];
-  for (let i = 0; i < data.trip.legs.length; i++) {
-    const legCoords = decodePolyline(data.trip.legs[i].shape);
-    allCoords.push(...(i === 0 ? legCoords : legCoords.slice(1)));
+  return decodeTrip(data.trip);
+}
+
+/**
+ * Fetch a point-to-point pedestrian route plus up to `maxAlternates` alternatives.
+ * Returns an array of RouteResults (primary first, then alternates).
+ */
+export async function fetchRouteAlternates(
+  start: Waypoint,
+  end: Waypoint,
+  apiKey: string,
+  maxAlternates = 2,
+): Promise<RouteResult[]> {
+  const body = {
+    locations: [
+      { lon: start.lng, lat: start.lat, type: 'break' },
+      { lon: end.lng, lat: end.lat, type: 'break' },
+    ],
+    costing: 'pedestrian',
+    directions_options: { units: 'km' },
+    alternates: maxAlternates,
+  };
+
+  const url = `https://api.stadiamaps.com/route?api_key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`Valhalla ${response.status}: ${text.slice(0, 200)}`);
   }
-  return { coords: allCoords, durationSeconds: Math.round(data.trip.summary.time) };
+
+  const data = await response.json() as {
+    trip: { legs: Array<{ shape: string }>; summary: { time: number } };
+    alternates?: Array<{ trip: { legs: Array<{ shape: string }>; summary: { time: number } } }>;
+  };
+
+  return [
+    decodeTrip(data.trip),
+    ...(data.alternates ?? []).map((a) => decodeTrip(a.trip)),
+  ];
 }

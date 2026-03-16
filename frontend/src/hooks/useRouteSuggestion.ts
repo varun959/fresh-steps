@@ -15,7 +15,7 @@ interface UseRouteSuggestionReturn {
   loading: boolean
   error: string | null
   selectedIndex: number | null
-  suggestRoutes: (startLat: number, startLng: number, durationMinutes: number, userId?: string) => Promise<void>
+  suggestRoutes: (startLat: number, startLng: number, durationMinutes: number, userId?: string, endLat?: number, endLng?: number) => Promise<void>
   selectRoute: (index: number) => void
   clearRoutes: () => void
 }
@@ -31,6 +31,8 @@ export function useRouteSuggestion(): UseRouteSuggestionReturn {
     startLng: number,
     durationMinutes: number,
     userId?: string,
+    endLat?: number,
+    endLng?: number,
   ) => {
     setLoading(true)
     setError(null)
@@ -41,7 +43,7 @@ export function useRouteSuggestion(): UseRouteSuggestionReturn {
       const response = await fetch(`${BACKEND_URL}/api/routes/suggest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startLat, startLng, durationMinutes, userId }),
+        body: JSON.stringify({ startLat, startLng, durationMinutes, userId, endLat, endLng }),
       })
 
       if (!response.ok) {

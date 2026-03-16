@@ -48,6 +48,8 @@ const AREAS = [
   { name: 'NYC Manhattan S', bbox: '40.70,-74.02,40.79,-73.91' },
   { name: 'NYC Manhattan N-W', bbox: '40.79,-74.02,40.88,-73.96' },
   { name: 'NYC Manhattan N-E', bbox: '40.79,-73.96,40.88,-73.91' },
+  { name: 'Andover MA', bbox: '42.60,-71.23,42.70,-71.09' },
+  { name: 'North Andover MA', bbox: '42.63,-71.18,42.75,-71.05' },
 ];
 
 interface OverpassNode {

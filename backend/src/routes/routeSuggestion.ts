@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import sql from '../db';
-import { fetchRoute } from '../lib/valhalla';
+import { fetchRoute, fetchRouteAlternates } from '../lib/valhalla';
 import { generateCandidates, type CandidateWaypoints } from '../lib/candidates';
 import { classifyLoopType } from '../lib/routeClassifier';
 
@@ -12,6 +12,8 @@ interface SuggestBody {
   startLat: number;
   startLng: number;
   durationMinutes: number;
+  endLat?: number;
+  endLng?: number;
   userId?: string;
 }
 
@@ -79,12 +81,16 @@ function coordinatesToDistanceKm(coords: [number, number][]): number {
 
 // POST /api/routes/suggest
 router.post('/suggest', async (req: Request, res: Response) => {
-  const { startLat, startLng, durationMinutes, userId } = req.body as SuggestBody;
+  const { startLat, startLng, durationMinutes, endLat, endLng, userId } = req.body as SuggestBody;
 
-  if (!startLat || !startLng || !durationMinutes) {
-    return res.status(400).json({ error: 'startLat, startLng, and durationMinutes are required' });
+  if (!startLat || !startLng) {
+    return res.status(400).json({ error: 'startLat and startLng are required' });
   }
-  if (durationMinutes < 5 || durationMinutes > 480) {
+  // durationMinutes is only required for loop mode (no end pin)
+  if (!endLat && !endLng && !durationMinutes) {
+    return res.status(400).json({ error: 'durationMinutes is required when no end point is provided' });
+  }
+  if (durationMinutes && (durationMinutes < 5 || durationMinutes > 480)) {
     return res.status(400).json({ error: 'durationMinutes must be between 5 and 480' });
   }
 
@@ -94,6 +100,38 @@ router.post('/suggest', async (req: Request, res: Response) => {
   }
 
   const effectiveUserId = userId ?? DEMO_USER_ID;
+
+  // --- Point-to-point mode: start pin + end pin ---
+  if (endLat && endLng) {
+    let routes: RouteResult[];
+    try {
+      const results = await fetchRouteAlternates(
+        { lat: startLat, lng: startLng },
+        { lat: endLat, lng: endLng },
+        apiKey,
+      );
+      routes = await Promise.all(
+        results.map(async ({ coords, durationSeconds }) => {
+          const distanceKm = coordinatesToDistanceKm(coords);
+          const freshnessPercent = effectiveUserId
+            ? await scoreFreshness(coords, effectiveUserId).catch(() => 100)
+            : 100;
+          return {
+            type: 'one-way' as const,
+            geometry: { type: 'LineString' as const, coordinates: coords },
+            distanceKm: Math.round(distanceKm * 10) / 10,
+            durationMinutes: Math.round(durationSeconds / 60),
+            freshnessPercent: Math.round(freshnessPercent * 10) / 10,
+          };
+        }),
+      );
+    } catch (err) {
+      console.error('P2P Valhalla error:', (err as Error).message);
+      return res.status(502).json({ error: 'Routing failed — check that start and end are reachable on foot' });
+    }
+    routes.sort((a, b) => b.freshnessPercent - a.freshnessPercent);
+    return res.json({ routes });
+  }
 
   // 1. Convert duration to target distance (walking at ~5 km/h)
   const targetDistanceKm = (durationMinutes / 60) * 5;

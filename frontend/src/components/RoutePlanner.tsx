@@ -14,7 +14,9 @@ import type { RouteResult } from '../hooks/useRouteSuggestion'
 
 interface RoutePlannerProps {
   startPin: { lat: number; lng: number } | null
+  endPin: { lat: number; lng: number } | null
   onClearPin: () => void
+  onClearEndPin: () => void
   onRouteSelected: (route: RouteResult | null) => void
   userId?: string
   /** Called when the panel opens or closes so the parent can enable map-click pin placement */
@@ -79,11 +81,13 @@ function FreshnessBar({ percent }: { percent: number }) {
   )
 }
 
-export function RoutePlanner({ startPin, onClearPin, onRouteSelected, userId, onOpenChange }: RoutePlannerProps) {
+export function RoutePlanner({ startPin, endPin, onClearPin, onClearEndPin, onRouteSelected, userId, onOpenChange }: RoutePlannerProps) {
   const [open, setOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [duration, setDuration] = useState(45)
   const { routes, loading, error, selectedIndex, suggestRoutes, selectRoute, clearRoutes } = useRouteSuggestion()
+
+  const isP2P = !!(startPin && endPin)
 
   function handleOpen() {
     setOpen(true)
@@ -96,6 +100,7 @@ export function RoutePlanner({ startPin, onClearPin, onRouteSelected, userId, on
     onOpenChange?.(false)
     clearRoutes()
     onClearPin()
+    onClearEndPin()
     onRouteSelected(null)
   }
 
@@ -103,7 +108,7 @@ export function RoutePlanner({ startPin, onClearPin, onRouteSelected, userId, on
     if (!startPin) return
     setCollapsed(false)
     onRouteSelected(null)
-    suggestRoutes(startPin.lat, startPin.lng, duration, userId)
+    suggestRoutes(startPin.lat, startPin.lng, duration, userId, endPin?.lat, endPin?.lng)
   }
 
   function handleSelect(index: number) {
@@ -160,16 +165,16 @@ export function RoutePlanner({ startPin, onClearPin, onRouteSelected, userId, on
       </div>
 
       {!collapsed && <div className="overflow-y-auto flex-1 p-4 space-y-4">
-        {/* Start pin info */}
+        {/* Start pin */}
         <div>
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Start point</p>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Start</p>
           {startPin ? (
             <div className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2">
               <span className="text-sm font-mono text-gray-700">
                 {startPin.lat.toFixed(5)}, {startPin.lng.toFixed(5)}
               </span>
               <button
-                onClick={() => { onClearPin(); clearRoutes(); onRouteSelected(null) }}
+                onClick={() => { onClearPin(); onClearEndPin(); clearRoutes(); onRouteSelected(null) }}
                 className="text-xs text-red-500 hover:text-red-700 ml-2"
               >
                 Clear
@@ -180,26 +185,50 @@ export function RoutePlanner({ startPin, onClearPin, onRouteSelected, userId, on
           )}
         </div>
 
-        {/* Duration input */}
-        <div>
-          <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
-            Duration: <span className="text-green-700 font-semibold">{duration} min</span>
-          </label>
-          <input
-            type="range"
-            min={15}
-            max={180}
-            step={5}
-            value={duration}
-            onChange={(e) => setDuration(Number(e.target.value))}
-            className="w-full accent-green-600"
-          />
-          <div className="flex justify-between text-xs text-gray-400 mt-0.5">
-            <span>15 min</span>
-            <span>~{((duration / 60) * 5).toFixed(1)} km</span>
-            <span>3 hr</span>
+        {/* End pin — only shown once start is placed */}
+        {startPin && (
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">End <span className="normal-case font-normal text-gray-400">(optional)</span></p>
+            {endPin ? (
+              <div className="flex items-center justify-between bg-red-50 rounded-lg px-3 py-2">
+                <span className="text-sm font-mono text-gray-700">
+                  {endPin.lat.toFixed(5)}, {endPin.lng.toFixed(5)}
+                </span>
+                <button
+                  onClick={() => { onClearEndPin(); clearRoutes(); onRouteSelected(null) }}
+                  className="text-xs text-red-500 hover:text-red-700 ml-2"
+                >
+                  Clear
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 italic">Tap the map to set an end point</p>
+            )}
           </div>
-        </div>
+        )}
+
+        {/* Duration — only for loop mode (no end pin) */}
+        {!isP2P && (
+          <div>
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
+              Duration: <span className="text-green-700 font-semibold">{duration} min</span>
+            </label>
+            <input
+              type="range"
+              min={15}
+              max={180}
+              step={5}
+              value={duration}
+              onChange={(e) => setDuration(Number(e.target.value))}
+              className="w-full accent-green-600"
+            />
+            <div className="flex justify-between text-xs text-gray-400 mt-0.5">
+              <span>15 min</span>
+              <span>~{((duration / 60) * 5).toFixed(1)} km</span>
+              <span>3 hr</span>
+            </div>
+          </div>
+        )}
 
         {/* Find Routes button — always visible so duration can be changed and re-searched */}
         {!loading && (

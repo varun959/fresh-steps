@@ -42,6 +42,14 @@ const startPinIcon = L.divIcon({
   className: '',
 })
 
+// Custom end-pin icon (red dot)
+const endPinIcon = L.divIcon({
+  html: `<div style="width:16px;height:16px;border-radius:50%;background:#dc2626;border:3px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3)"></div>`,
+  iconSize: [16, 16],
+  iconAnchor: [8, 8],
+  className: '',
+})
+
 // Module-level map ref — populated by CaptureMap inside MapContainer.
 const mapRef: { current: L.Map | null } = { current: null }
 
@@ -127,6 +135,7 @@ function MapClickHandler({
 
 function App() {
   const [startPin, setStartPin] = useState<{ lat: number; lng: number } | null>(null)
+  const [endPin, setEndPin] = useState<{ lat: number; lng: number } | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<RouteResult | null>(null)
   const [plannerOpen, setPlannerOpen] = useState(false)
   const [walkCoords, setWalkCoords] = useState<[number, number][]>([])
@@ -140,9 +149,15 @@ function App() {
   }, [])
 
   function handleMapClick(lat: number, lng: number) {
-    // Only place a pin while the planner panel is open
-    if (plannerOpen) {
+    if (!plannerOpen) return
+    if (!startPin) {
       setStartPin({ lat, lng })
+    } else if (!endPin) {
+      setEndPin({ lat, lng })
+    } else {
+      // Both pins set — third tap starts over with a new start pin
+      setStartPin({ lat, lng })
+      setEndPin(null)
     }
   }
 
@@ -178,13 +193,21 @@ function App() {
       {/* Location search — centered below the header */}
       <LocationSearch onSelect={handleLocationSelect} />
 
-      {/* Hint banner when planner is open and no pin placed yet (below search bar) */}
+      {/* Hint banner — guides user through pin placement */}
       {plannerOpen && !startPin && (
         <div
           style={{ zIndex: 1000, top: '6rem' }}
           className="absolute left-1/2 -translate-x-1/2 mt-2 bg-white text-gray-700 text-xs px-4 py-2 rounded-full shadow-md pointer-events-none"
         >
           Tap the map to set a start point
+        </div>
+      )}
+      {plannerOpen && startPin && !endPin && (
+        <div
+          style={{ zIndex: 1000, top: '6rem' }}
+          className="absolute left-1/2 -translate-x-1/2 mt-2 bg-white text-gray-700 text-xs px-4 py-2 rounded-full shadow-md pointer-events-none"
+        >
+          Tap to set an end point, or find routes from start
         </div>
       )}
 
@@ -232,6 +255,13 @@ function App() {
           </Marker>
         )}
 
+        {/* End pin */}
+        {endPin && (
+          <Marker position={[endPin.lat, endPin.lng]} icon={endPinIcon}>
+            <Popup>End point</Popup>
+          </Marker>
+        )}
+
         {/* Selected route polyline — arrows for loops, plain line for one-way */}
         {routePositions && selectedRoute && (
           <RoutePolyline
@@ -261,7 +291,9 @@ function App() {
       {/* Route Planner panel / FAB */}
       <RoutePlanner
         startPin={startPin}
+        endPin={endPin}
         onClearPin={() => setStartPin(null)}
+        onClearEndPin={() => setEndPin(null)}
         onRouteSelected={setSelectedRoute}
         userId={DEMO_USER_ID}
         onOpenChange={setPlannerOpen}
