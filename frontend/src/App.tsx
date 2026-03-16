@@ -125,9 +125,14 @@ function MapClickHandler({
 }: {
   onMapClick: (lat: number, lng: number) => void
 }) {
+  // react-leaflet's useMapEvents captures the handler at mount and doesn't re-register
+  // on prop changes. Store the latest callback in a ref so clicks always use fresh state.
+  const onMapClickRef = useRef(onMapClick)
+  useEffect(() => { onMapClickRef.current = onMapClick }, [onMapClick])
+
   useMapEvents({
     click(e) {
-      onMapClick(e.latlng.lat, e.latlng.lng)
+      onMapClickRef.current(e.latlng.lat, e.latlng.lng)
     },
   })
   return null
