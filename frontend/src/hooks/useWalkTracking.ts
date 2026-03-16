@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { haversineMeters, isAccuracyAcceptable, isFarEnough, totalDistanceKm } from '../lib/gps'
+import { isAccuracyAcceptable, isFarEnough, totalDistanceKm } from '../lib/gps'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const WALK_STORAGE_KEY = 'fresh-steps-walk-in-progress'
