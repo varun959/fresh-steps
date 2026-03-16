@@ -26,32 +26,37 @@ interface RouteResult {
 }
 
 /**
- * Score a route's freshness by intersecting its geometry against covered_segments.
- * Returns a percentage of uncovered distance (higher = more fresh).
+ * Score a route's freshness: percentage of route length that runs through already-covered ways.
+ *
+ * Approach: buffer each covered_segment by 8m to create a polygon, union them, then measure
+ * how much of the route line falls inside the union. This is fast (covered_segments is small)
+ * and correct (avoids the parallel-lines problem where two thin LineStrings never touch).
+ *
+ * Returns 0–100 where 100 = fully fresh (nothing covered) and 0 = fully covered.
  */
 async function scoreFreshness(
   coordinates: [number, number][],
   userId: string,
 ): Promise<number> {
-  const geojson = JSON.stringify({
-    type: 'LineString',
-    coordinates,
-  });
+  const geojson = JSON.stringify({ type: 'LineString', coordinates });
 
   const [row] = await sql`
     SELECT
       ST_Length(ST_GeomFromGeoJSON(${geojson})::geography) AS total_m,
-      COALESCE(SUM(
+      COALESCE(
         ST_Length(
           ST_Intersection(
-            cs.geometry::geography,
-            ST_GeomFromGeoJSON(${geojson})::geography
-          )
-        )
-      ), 0) AS covered_m
-    FROM covered_segments cs
-    WHERE cs.user_id = ${userId}::uuid
-      AND ST_Intersects(cs.geometry, ST_GeomFromGeoJSON(${geojson}))
+            ST_GeomFromGeoJSON(${geojson}),
+            (
+              SELECT ST_Union(ST_Buffer(cs.geometry::geography, 8)::geometry)
+              FROM covered_segments cs
+              WHERE cs.user_id = ${userId}::uuid
+                AND ST_DWithin(cs.geometry::geography, ST_GeomFromGeoJSON(${geojson})::geography, 15)
+            )
+          )::geography
+        ),
+        0
+      ) AS covered_m
   `;
 
   const totalM = Number(row.total_m) || 0;
