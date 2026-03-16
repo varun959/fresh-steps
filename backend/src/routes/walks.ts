@@ -62,16 +62,34 @@ router.post('/', async (req: Request, res: Response) => {
       SELECT
         id,
         ST_AsGeoJSON(geometry)::json AS geometry
-      FROM osm_ways
-      WHERE ST_DWithin(geometry::geography, ST_GeomFromGeoJSON(${lineGeoJSON})::geography, 8)
+      FROM osm_ways w
+      WHERE ST_DWithin(w.geometry::geography, ST_GeomFromGeoJSON(${lineGeoJSON})::geography, 8)
         AND ST_Length(
           ST_Intersection(
             ST_Buffer(
               ST_GeomFromGeoJSON(${lineGeoJSON})::geography,
-              CASE WHEN highway IN ('footway','path','cycleway','steps','pedestrian')
-                   THEN 8 ELSE 4 END
+              CASE
+                -- Dedicated foot/cycle paths: always use full 8m GPS-noise margin
+                WHEN w.highway IN ('footway','path','cycleway','steps','pedestrian') THEN 8
+                -- Road with a mapped parallel footway within 8m: shrink to 4m so that
+                -- walking on the footway doesn't also credit the road centerline
+                WHEN EXISTS (
+                  SELECT 1 FROM osm_ways fw
+                  WHERE fw.highway IN ('footway','path','cycleway','steps','pedestrian')
+                    AND ST_DWithin(fw.geometry::geography, w.geometry::geography, 8)
+                    AND ST_Length(
+                      ST_Intersection(
+                        ST_Buffer(ST_GeomFromGeoJSON(${lineGeoJSON})::geography, 8)::geometry,
+                        fw.geometry
+                      )::geography
+                    ) > 20
+                ) THEN 4
+                -- Road with no mapped footway: keep 8m so GPS noise on the road itself
+                -- doesn't prevent it from being credited
+                ELSE 8
+              END
             )::geometry,
-            geometry
+            w.geometry
           )::geography
         ) > 20
     `;
