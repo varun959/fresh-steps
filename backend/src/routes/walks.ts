@@ -45,11 +45,19 @@ router.post('/', async (req: Request, res: Response) => {
       RETURNING id, distance_meters
     `;
 
-    // Find OSM ways within 8m of the walk that also overlap the buffer for at least 20m.
-    // The proximity check alone would match cross-streets at every intersection (they pass
-    // within 8m of the path). The overlap-length check filters those out: a perpendicular
-    // cross-street only intersects the 8m buffer for ~16m, while a road actually walked
-    // along overlaps for the full length of the segment.
+    // Find OSM ways that overlap the walk path sufficiently to be considered "covered".
+    //
+    // Buffer sizes are highway-type-aware:
+    //   - footway / path / cycleway / steps / pedestrian → 8m
+    //     (GPS on a sidewalk can be 3–6m off; we need margin to reach the way geometry)
+    //   - all road types (residential, tertiary, primary, …) → 4m
+    //     (Swiss OSM maps sidewalks as separate footway ways running 3–8m alongside the
+    //     road centerline; an 8m buffer would credit the road whenever you walk on its
+    //     parallel footway. 4m prevents that without losing genuine road coverage.)
+    //
+    // The ST_DWithin(…, 8) pre-filter uses the larger value so the index scan catches
+    // all candidates; the ST_Buffer CASE expression then applies the correct size.
+    // The 20m overlap threshold still filters out perpendicular cross-streets.
     const ways = await sql`
       SELECT
         id,
@@ -58,7 +66,11 @@ router.post('/', async (req: Request, res: Response) => {
       WHERE ST_DWithin(geometry::geography, ST_GeomFromGeoJSON(${lineGeoJSON})::geography, 8)
         AND ST_Length(
           ST_Intersection(
-            ST_Buffer(ST_GeomFromGeoJSON(${lineGeoJSON})::geography, 8)::geometry,
+            ST_Buffer(
+              ST_GeomFromGeoJSON(${lineGeoJSON})::geography,
+              CASE WHEN highway IN ('footway','path','cycleway','steps','pedestrian')
+                   THEN 8 ELSE 4 END
+            )::geometry,
             geometry
           )::geography
         ) > 20
