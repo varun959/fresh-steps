@@ -58,40 +58,40 @@ router.post('/', async (req: Request, res: Response) => {
     // The ST_DWithin(…, 8) pre-filter uses the larger value so the index scan catches
     // all candidates; the ST_Buffer CASE expression then applies the correct size.
     // The 20m overlap threshold still filters out perpendicular cross-streets.
+    // Way-matching uses geometry (not geography) for the DWithin pre-filter so that
+    // the GiST index on osm_ways.geometry is used. geography DWithin causes a full
+    // table scan on 768K rows (30+ seconds). Degree-equivalent distances at 42–50° lat:
+    //   8m  ≈ 0.000105° (longitude at 47°N, safe upper bound)
+    //   pre-filter uses 0.000120° to avoid missing ways at bbox edges
+    //
+    // Two-CTE approach:
+    //   1. matched_ways  — index-backed pre-filter + planar intersection > 20m
+    //   2. roads_to_exclude — roads with a parallel matched footway (Swiss OSM pattern)
+    //      The join is on ~15–20 rows, so geography DWithin is fine there.
     const ways = await sql`
-      SELECT
-        id,
-        ST_AsGeoJSON(geometry)::json AS geometry
-      FROM osm_ways w
-      WHERE ST_DWithin(w.geometry::geography, ST_GeomFromGeoJSON(${lineGeoJSON})::geography, 8)
-        AND ST_Length(
-          ST_Intersection(
-            ST_Buffer(
-              ST_GeomFromGeoJSON(${lineGeoJSON})::geography,
-              CASE
-                -- Dedicated foot/cycle paths: always use full 8m GPS-noise margin
-                WHEN w.highway IN ('footway','path','cycleway','steps','pedestrian') THEN 8
-                -- Road with a mapped parallel footway within 8m: shrink to 4m so that
-                -- walking on the footway doesn't also credit the road centerline
-                WHEN EXISTS (
-                  SELECT 1 FROM osm_ways fw
-                  WHERE fw.highway IN ('footway','path','cycleway','steps','pedestrian')
-                    AND ST_DWithin(fw.geometry::geography, w.geometry::geography, 8)
-                    AND ST_Length(
-                      ST_Intersection(
-                        ST_Buffer(ST_GeomFromGeoJSON(${lineGeoJSON})::geography, 8)::geometry,
-                        fw.geometry
-                      )::geography
-                    ) > 20
-                ) THEN 4
-                -- Road with no mapped footway: keep 8m so GPS noise on the road itself
-                -- doesn't prevent it from being credited
-                ELSE 8
-              END
-            )::geometry,
-            w.geometry
-          )::geography
-        ) > 20
+      WITH walk_geom AS MATERIALIZED (
+        SELECT ST_GeomFromGeoJSON(${lineGeoJSON}) AS geom,
+               ST_Buffer(ST_GeomFromGeoJSON(${lineGeoJSON}), 0.000105) AS buf
+      ),
+      matched_ways AS MATERIALIZED (
+        SELECT w.id, w.highway, w.geometry
+        FROM osm_ways w, walk_geom
+        WHERE ST_DWithin(w.geometry, walk_geom.geom, 0.000120)
+          AND ST_Length(
+            ST_Intersection(walk_geom.buf, w.geometry)::geography
+          ) > 20
+      ),
+      roads_to_exclude AS (
+        SELECT DISTINCT r.id
+        FROM matched_ways r
+        JOIN matched_ways fw
+          ON fw.highway IN ('footway','path','cycleway','steps','pedestrian')
+         AND ST_DWithin(fw.geometry::geography, r.geometry::geography, 8)
+        WHERE r.highway NOT IN ('footway','path','cycleway','steps','pedestrian')
+      )
+      SELECT id, ST_AsGeoJSON(geometry)::json AS geometry
+      FROM matched_ways
+      WHERE id NOT IN (SELECT id FROM roads_to_exclude)
     `;
 
     // Upsert covered_segments for both sides of each matched way
