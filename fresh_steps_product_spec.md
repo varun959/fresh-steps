@@ -1,8 +1,8 @@
 # Fresh Steps — Product Specification
 
-**Version:** 0.5
+**Version:** 0.6
 **Status:** MVP In Development
-**Last Updated:** March 4, 2026
+**Last Updated:** March 23, 2026
 
 ---
 
@@ -57,11 +57,14 @@ Coverage is tracked **per sidewalk side** (left/right), not per road. Walking on
 
 ### 3.2 Route Suggestion
 
-1. User sets a start pin on the map and enters walk duration (slider: 15–120 min)
+Two modes depending on whether the user places one or two pins:
+
+**Loop mode (one pin):**
+1. User sets a start pin and enters walk duration (slider: 15–120 min)
 2. App generates 16 candidates: 8 triangle loops (N, NE, E, SE, S, SW, W, NW) + 8 one-way variants
    - Loops use 3 waypoints at ±60° from the target direction to force genuinely different outbound and return roads
 3. Each candidate is routed via Valhalla (Stadia Maps hosted) with pedestrian costing
-4. Freshness score: `(total_m - covered_m) / total_m × 100` via PostGIS `ST_Intersection`
+4. Freshness score: `(total_m - covered_m) / total_m × 100` — covered_m computed by buffering covered_segments by 8 m, unioning, and measuring intersection with the route
 5. Routes are classified into 3 types:
    - **Loop** — different roads each way (blue badge)
    - **Out & Back** — same road, opposite sidewalks (orange badge) — detected when return leg stays within 20 m of outbound leg
@@ -69,16 +72,25 @@ Coverage is tracked **per sidewalk side** (left/right), not per road. Walking on
 6. Top 3 results enforce one of each type where available, then fill by freshness
 7. User picks a route → opens Google Maps for turn-by-turn navigation
 
-**API:** `POST /api/routes/suggest` — body: `{ startLat, startLng, durationMinutes, userId? }`
+**Two-pin (P2P) mode:**
+1. User taps start pin, then taps a second pin for the destination (duration slider hidden)
+2. App fetches up to 3 Valhalla route alternates between the two points
+3. Routes scored by freshness and returned sorted (freshest first)
+4. All routes shown as One-way type
+
+**API:** `POST /api/routes/suggest` — body: `{ startLat, startLng, durationMinutes, userId?, endLat?, endLng? }`
 
 ### 3.3 Walk Tracking
 
 1. User taps "Start Walk" — browser requests GPS permission
-2. GPS positions recorded via `navigator.geolocation.watchPosition` (min movement: 10 m)
-3. Live path rendered as blue polyline on the map
-4. Timer shows elapsed time; distance computed via haversine formula
-5. User taps "Stop Walk" — walk saved to database, coverage map refreshes
-6. Summary card shows: distance, duration, new streets count, GPX download link, Discard button
+2. GPS positions recorded via `navigator.geolocation.watchPosition` (min movement: 10 m, accuracy threshold: 150 m to filter coarse network fixes)
+3. Walk-in-progress persisted to localStorage — page reloads mid-walk automatically restore tracking
+4. Screen Wake Lock (`navigator.wakeLock`) acquired on tracking start; re-acquired on tab resume. Badge shows "☀ screen on" (green) or "⚠ screen off risk" (amber)
+5. If tab is hidden for >30 s and Wake Lock was lost, an amber warning banner is shown on resume (GPS gap likely)
+6. Live path rendered as orange polyline on the map
+7. Timer shows elapsed time; distance computed via haversine formula
+8. User taps "Stop Walk" — walk saved to database, coverage map refreshes
+9. Summary card shows: distance, duration, new streets count, GPX download link, Discard button
    - Discard deletes the walk and its covered_segments from the database
 
 **States:** `idle → tracking → saving → done`
@@ -165,8 +177,8 @@ UNIQUE (user_id, osm_way_id, side)
 ### OSM Data
 
 - Road network fetched from Overpass API and stored in `osm_ways`
-- Seeded regions: Baar, Zurich, Bangalore (6 quadrants), Manhattan (3 tiles)
-- Total: ~307,000 ways
+- Seeded regions: Baar, Zurich, Andover MA, North Andover MA, Bangalore (6 quadrants), Manhattan (3 tiles)
+- Total: ~768,000 ways
 - Re-seed script: `backend/src/scripts/seed-osm.ts`
 - Filter by region: `SEED_AREAS="Bangalore" npx ts-node --transpile-only src/scripts/seed-osm.ts`
 
@@ -206,7 +218,7 @@ UI/UX refinement, performance optimization, mobile experience polish, bug fixes.
 
 ## 7. Known Constraints and Trade-offs
 
-- **Map matching accuracy:** GPS walks matched to OSM ways within 8 m. Tighter threshold reduces false positives; may miss valid coverage on wide roads.
+- **Map matching accuracy:** GPS walks matched to OSM ways using a geometry DWithin pre-filter (0.000120°, ~13 m at 47°N) with a 20 m minimum overlap to filter perpendicular cross-streets. Roads with a mapped parallel footway within 8 m are excluded from road credit (Swiss OSM maps sidewalks as separate footway ways 3–8 m from road centerlines). The GiST index on `osm_ways.geometry` must be used via geometry-type (not geography-type) DWithin — the geography cast causes a full 768K-row scan.
 - **Coverage granularity:** Both sides of a way are marked covered when a walk passes within 8 m — actual side detection (left/right based on heading) is not yet implemented; the `side` column stores 'left' and 'right' as duplicates per way.
 - **Geolocation on non-HTTPS:** Blocked everywhere except `localhost`. App requires HTTPS in production.
 - **Offline support:** OSM tiles cached via PWA service worker. Road segment data requires network.
